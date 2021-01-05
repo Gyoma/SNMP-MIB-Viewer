@@ -5,50 +5,50 @@
 
 struct ModuleImport
 {
-	ModuleImport();
-	ModuleImport(const std::string& Module, const Strs& Labels);
-	ModuleImport(const ModuleImport& other);
-	ModuleImport(ModuleImport&& other) noexcept;
+    ModuleImport();
+    ModuleImport(const std::string& Module, const Strs& Labels);
+    ModuleImport(const ModuleImport& other);
+    ModuleImport(ModuleImport&& other) noexcept;
 
-	std::string module;  /* The module imported from */
-	Strs labels;  /* The descriptor being imported */
+    std::string module;  /* The module imported from */
+    Strs labels;  /* The descriptor being imported */
 };
 
 
 struct Module
 {
-	using Ptr = std::shared_ptr<Module>;
-	using Imports = std::vector<ModuleImport>;
+    using Ptr = std::shared_ptr<Module>;
+    using Imports = std::vector<ModuleImport>;
 
-	Module();
-	Module(const std::string& Module, const std::string& FileName, 
-		const std::vector<ModuleImport>& Imports, bool IsParsed);
+    Module();
+    Module(const std::string& Module, const std::string& FileName,
+        const std::vector<ModuleImport>& Imports, bool IsParsed);
 
-	Module(const Module& other);
-	Module(Module&& other) noexcept;
+    Module(const Module& other);
+    Module(Module&& other) noexcept;
 
-	const std::string	moduleName;
-	std::string			fileName;
-	Imports				imports;
-	NodeTable			nodes;
-	bool				isParsed;
+    const std::string	moduleName;
+    std::string			fileName;
+    Imports				imports;
+    NodeTable			nodes;
+    bool				isParsed;
 };
 
 class ModuleTable
 {
 public:
-	
-	using Ptr = std::shared_ptr<ModuleTable>;
 
-	ModuleTable(const std::string& folderPath);
-	
-	Module::Ptr findModule(const std::string& Name) const;
-	Node::Ptr findNode(const std::string& Name, const std::string& Module = std::string()) const;
+    using Ptr = std::shared_ptr<ModuleTable>;
 
-	void addModule(const Module::Ptr& Module);
-	bool deleteModule(const std::string& Name);
+    ModuleTable(const std::string& folderPath);
+
+    Module::Ptr findModule(const std::string& Name) const;
+    Node::Ptr findNode(const std::string& Name, const std::string& Module = std::string()) const;
+
+    void addModule(const Module::Ptr& Module);
+    bool deleteModule(const std::string& Name);
 
 private:
 
-	std::unordered_map<std::string, Module::Ptr> _modules;
+    std::unordered_map<std::string, Module::Ptr> _modules;
 };

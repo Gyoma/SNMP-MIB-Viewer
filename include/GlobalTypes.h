@@ -9,121 +9,121 @@
 //Lexem types
 enum LT
 {
-	//Keywords
+    //Keywords
 
-	eCONTINUE = -1,
-	eDEFINITIONS,
-	eBEGIN,
-	eEND,
-	eNA,
-	eError,
-	eENDOFFILE,
-	eIMPORTS,
-	eEXPORTS,
-	eFROM,
-	eEQUALS,
-	eLEFTPAREN,
-	eRIGHTPAREN,
-	eLEFTBRACKET,
-	eRIGHTBRACKET,
-	eLEFTSQBRACK,
-	eRIGHTSQBRACK,
-	eSEMI,
-	eCOMMA,
-	eBAR,
-	eRANGE,
-	eLASTUPDATED,
-	eORGANIZATION,
-	eCONTACTINFO,
-	eAUGMENTS,
-	eUNITS,
-	eREFERENCE,
-	eNUM_ENTRIES,
-	eOF,
-	eSEQUENCE,
-	eDESCRIPTION,
-	eINDEX,
-	eDEFVAL,
-	eSIZE,
-	eMAXACCESS,
-	eACCESS,
-	eMINACCESS,
-	eSTATUS,
-	eSYNTAX,
-	eENTERPRISE,
-	eDISPLAYHINT,
-	eIMPLIED,
-	eSUPPORTS,
-	eINCLUDES,
-	eVARIATION,
-	eREVISION,
-	eOBJECTS,
-	eMODULE,
-	ePRODREL,
-	eWRSYNTAX,
-	eCREATEREQ,
-	eMANDATORYGROUPS,
-	eGROUP,
-	eCHOICE,
-	eIMPLICIT,
+    eCONTINUE = -1,
+    eDEFINITIONS,
+    eBEGIN,
+    eEND,
+    eNA,
+    eError,
+    eENDOFFILE,
+    eIMPORTS,
+    eEXPORTS,
+    eFROM,
+    eEQUALS,
+    eLEFTPAREN,
+    eRIGHTPAREN,
+    eLEFTBRACKET,
+    eRIGHTBRACKET,
+    eLEFTSQBRACK,
+    eRIGHTSQBRACK,
+    eSEMI,
+    eCOMMA,
+    eBAR,
+    eRANGE,
+    eLASTUPDATED,
+    eORGANIZATION,
+    eCONTACTINFO,
+    eAUGMENTS,
+    eUNITS,
+    eREFERENCE,
+    eNUM_ENTRIES,
+    eOF,
+    eSEQUENCE,
+    eDESCRIPTION,
+    eINDEX,
+    eDEFVAL,
+    eSIZE,
+    eMAXACCESS,
+    eACCESS,
+    eMINACCESS,
+    eSTATUS,
+    eSYNTAX,
+    eENTERPRISE,
+    eDISPLAYHINT,
+    eIMPLIED,
+    eSUPPORTS,
+    eINCLUDES,
+    eVARIATION,
+    eREVISION,
+    eOBJECTS,
+    eMODULE,
+    ePRODREL,
+    eWRSYNTAX,
+    eCREATEREQ,
+    eMANDATORYGROUPS,
+    eGROUP,
+    eCHOICE,
+    eIMPLICIT,
 
-	//Types
+    //Types
 
-	eOTHER,
-	eLABEL,
-	eOBSOLETE,
-	eOPTIONAL,
-	eMODULEIDENTITY,
-	eNOACCESS,
-	eWRITEONLY,
-	eNUMENTRIES,
-	eNOTIFTYPE,
-	eOBJGROUP,
-	eCOMPLIANCE,
-	eIDENTIFIER,
-	eOBJECT,
-	eREADWRITE,
-	eREADCREATE,
-	eREADONLY,
-	eDEPRECATED,
-	eMANDATORY,
-	eCURRENT,
-	eOBJTYPE,
-	eTRAPTYPE,
-	eACCNOTIFY,
-	eCONVENTION,
-	eNOTIFGROUP,
-	eAGENTCAP,
-	eMACRO,
-	eNOTIMPL,
-	eNOTIFICATIONS,
-	eNUMBER,
-	eQUOTESTRING,
+    eOTHER,
+    eLABEL,
+    eOBSOLETE,
+    eOPTIONAL,
+    eMODULEIDENTITY,
+    eNOACCESS,
+    eWRITEONLY,
+    eNUMENTRIES,
+    eNOTIFTYPE,
+    eOBJGROUP,
+    eCOMPLIANCE,
+    eIDENTIFIER,
+    eOBJECT,
+    eREADWRITE,
+    eREADCREATE,
+    eREADONLY,
+    eDEPRECATED,
+    eMANDATORY,
+    eCURRENT,
+    eOBJTYPE,
+    eTRAPTYPE,
+    eACCNOTIFY,
+    eCONVENTION,
+    eNOTIFGROUP,
+    eAGENTCAP,
+    eMACRO,
+    eNOTIMPL,
+    eNOTIFICATIONS,
+    eNUMBER,
+    eQUOTESTRING,
 
-	eSYNTAX_MASK = 0x80,
-	eOBJID,
-	eOCTETSTR,
-	eINTEGER,
-	eNETADDR,
-	eIPADDR,
-	eCOUNTER,
-	eGAUGE,
-	eTIMETICKS,
-	eOPAQUE,
-	eNULL,
-	eBITSTRING,
-	eNSAPADDRESS,
-	eCOUNTER64,
-	eUINTEGER32,
-	eAPPSYNTAX,
-	eOBJSYNTAX,
-	eSIMPLESYNTAX,
-	eOBJNAME,
-	eNOTIFNAME,
-	eVARIABLES,
-	eUNSIGNED32,
-	eINTEGER32,
-	eOBJIDENTITY
+    eSYNTAX_MASK = 0x80,
+    eOBJID,
+    eOCTETSTR,
+    eINTEGER,
+    eNETADDR,
+    eIPADDR,
+    eCOUNTER,
+    eGAUGE,
+    eTIMETICKS,
+    eOPAQUE,
+    eNULL,
+    eBITSTRING,
+    eNSAPADDRESS,
+    eCOUNTER64,
+    eUINTEGER32,
+    eAPPSYNTAX,
+    eOBJSYNTAX,
+    eSIMPLESYNTAX,
+    eOBJNAME,
+    eNOTIFNAME,
+    eVARIABLES,
+    eUNSIGNED32,
+    eINTEGER32,
+    eOBJIDENTITY
 };
 
 
@@ -137,26 +137,26 @@ using Objgroup = std::unordered_set<std::string>;
 
 struct Token
 {
-	Token(size_t lexemCapacity = 128) :
-		type(LT::eNA)
-	{
-		lexem.reserve(lexemCapacity);
-	}
+    Token(size_t lexemCapacity = 128) :
+        type(LT::eNA)
+    {
+        lexem.reserve(lexemCapacity);
+    }
 
-	std::string lexem;
-	LT type;
+    std::string lexem;
+    LT type;
 };
 
 struct SubID
 {
-	std::string		label;
-	int             subid;
+    std::string		label;
+    int             subid;
 };
 
 struct ErrorInfo
 {
-	bool isError = false;
-	std::string description;
+    bool isError = false;
+    std::string description;
 };
 
 /*
@@ -164,8 +164,8 @@ struct ErrorInfo
 */
 struct Enum
 {
-	int             value;
-	std::string		label;
+    int             value;
+    std::string		label;
 };
 
 using EnumList = std::vector<Enum>;
@@ -175,7 +175,7 @@ using EnumList = std::vector<Enum>;
 */
 struct Range
 {
-	int	low, high;
+    int	low, high;
 };
 
 using RangeList = std::vector<Range>;
@@ -185,8 +185,8 @@ using RangeList = std::vector<Range>;
 */
 struct Index
 {
-	std::string ilabel;
-	bool		isimplied;
+    std::string ilabel;
+    bool		isimplied;
 };
 
 using IndexList = std::vector<Index>;
