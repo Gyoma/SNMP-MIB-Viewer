@@ -14,8 +14,6 @@ struct TC
     EnumList		enums;
     RangeList		ragnes;
 
-    //struct enum_list *enums;
-    //struct range_list *ranges;
     std::string		description;
 };
 

@@ -168,14 +168,22 @@ class Parser
     Objgroup _objgroups, _objects, _notifs;
     ErrorInfo _errinf;
 
-    size_t _line = 0;
+    size_t _line;
     std::string _moduleName;
+
+    struct UndefinedNode
+    {
+        UndefinedNode(const Node::Ptr& Node, const std::string& Syntax);
+
+        Node::Ptr node;
+        std::string syntax;
+    };
+
+    std::vector<UndefinedNode> _undefNodes;
 
 public:
 
     Parser(Tree::Ptr tree = nullptr);
-    //Parser(std::shared_ptr<ModuleList> const& moduleList = NULL);
-    ~Parser();
 
     NodeList parse(std::ifstream& file);
     const ErrorInfo& lastErrorInfo();
@@ -188,19 +196,19 @@ public:
     void parseToken(std::ifstream& file, Token& token);
     void parseQuoteString(std::ifstream& file, Token& token);
     bool isLabelChar(char ch);
-    void parseImports(std::ifstream& file, const std::string& moduleName);
-    NodeList parseObjectGroup(std::ifstream& file, const std::string& objName, const std::string& moduleName, LT what, Objgroup& objgroup);
-    NodeList parseObjType(std::ifstream& file, const std::string& objName, const std::string& moduleName);
-    NodeList parseNotifType(std::ifstream& file, const std::string& objName, const std::string& moduleName);
-    NodeList parseCompliance(std::ifstream& file, const std::string& objName, const std::string& moduleName);
-    NodeList parseModuleIdentity(std::ifstream& file, const std::string& objName, const std::string& moduleName);
-    NodeList parseCapabilities(std::ifstream& file, const std::string& objName, const std::string& moduleName);
-    NodeList parseASN(std::ifstream& file, Token& token, const std::string& objName, const std::string& moduleName);
-    NodeList parseTrap(std::ifstream& file, const std::string& objName, const std::string& moduleName);
+    void parseImports(std::ifstream& file);
+    NodeList parseObjectGroup(std::ifstream& file, const std::string& objName, LT what, Objgroup& objgroup);
+    NodeList parseObjType(std::ifstream& file, const std::string& objName);
+    NodeList parseNotifType(std::ifstream& file, const std::string& objName);
+    NodeList parseCompliance(std::ifstream& file, const std::string& objName);
+    NodeList parseModuleIdentity(std::ifstream& file, const std::string& objName);
+    NodeList parseCapabilities(std::ifstream& file, const std::string& objName);
+    NodeList parseASN(std::ifstream& file, Token& token, const std::string& objName);
+    NodeList parseTrap(std::ifstream& file, const std::string& objName);
     NodeList parseMacro(std::ifstream& file);
 
-    NodeList mergeParsedObjectid(Node::Ptr& np, std::ifstream& file, const std::string& moduleName);
-    NodeList parseObjectid(std::ifstream& file, const std::string& objName, const std::string& moduleName);
+    NodeList mergeParsedObjectid(Node::Ptr& np, std::ifstream& file);
+    NodeList parseObjectid(std::ifstream& file, const std::string& objName);
     std::vector<SubID> parseOIDlist(std::ifstream& file);
 
     EnumList parseEnums(std::ifstream& file);
@@ -219,6 +227,7 @@ public:
     LoadStatus readModuleReplacements(const std::string& oldModuleName);
 
     void scanObjlist(const NodeList& root, const Module::Ptr& mp, Objgroup& list);
+    void resolveSyntax();
 
     std::string formError(const std::string& str, const std::string& lexem);
 

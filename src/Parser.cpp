@@ -3,12 +3,9 @@
 
 
 Parser::Parser(Tree::Ptr tree) :
-    _tree(tree)
+    _tree(tree),
+    _line(0)
 {}
-
-Parser::~Parser()
-{}
-
 
 bool Parser::isLabelChar(char ch)
 {
@@ -24,7 +21,7 @@ bool Parser::isLabelChar(char ch)
     return false;
 }
 
-void Parser::parseImports(std::ifstream& file, const std::string& moduleName)
+void Parser::parseImports(std::ifstream& file)
 {
     //	register int    type;
     //	char            token[MAXTOKEN];
@@ -134,7 +131,7 @@ void Parser::parseImports(std::ifstream& file, const std::string& moduleName)
      *   in the global module table
      */
 
-    auto& module = _tree->findModule(moduleName);
+    auto& module = _tree->findModule(_moduleName);
 
     if (module)
     {
@@ -200,7 +197,7 @@ void Parser::parseImports(std::ifstream& file, const std::string& moduleName)
     //	}
 
     _errinf.isError = true;
-    _errinf.description = "Module " + moduleName + " not found.";
+    _errinf.description = "Module " + _moduleName + " not found.";
 
     /*
      * Shouldn't get this far
@@ -210,7 +207,7 @@ void Parser::parseImports(std::ifstream& file, const std::string& moduleName)
 
 }
 
-NodeList Parser::parseObjectGroup(std::ifstream& file, const std::string& objName, const std::string& moduleName, LT what, Objgroup& objgroup)
+NodeList Parser::parseObjectGroup(std::ifstream& file, const std::string& objName, LT what, Objgroup& objgroup)
 {
     //int             type;
     //char            token[MAXTOKEN];
@@ -382,7 +379,7 @@ NodeList Parser::parseObjectGroup(std::ifstream& file, const std::string& objNam
         parseToken(file, token);
     //type = get_token(fp, token, MAXTOKEN);
 
-    return mergeParsedObjectid(np, file, moduleName);
+    return mergeParsedObjectid(np, file);
     //return merge_parse_objectid(np, fp, name);
 }
 
@@ -391,7 +388,7 @@ NodeList Parser::parseObjectGroup(std::ifstream& file, const std::string& objNam
 * Parses an OBJECT TYPE macro.
 * Returns 0 on error.
 */
-NodeList Parser::parseObjType(std::ifstream& file, const std::string& objName, const std::string& moduleName)
+NodeList Parser::parseObjType(std::ifstream& file, const std::string& objName)
 {
     //register int    type;
     //char            token[MAXTOKEN];
@@ -449,7 +446,10 @@ NodeList Parser::parseObjType(std::ifstream& file, const std::string& objName, c
             token.type = _tclist.getTC(tc_index).type;
             //np->tc_index = tc_index; //hz
         }
-
+        else
+        {
+            _undefNodes.emplace_back(np, token.lexem);
+        }
         //int             tmp_index;
         //tctype = get_tc(token, current_module, &tmp_index,
         //	&np->enums, &np->ranges, &np->hint);
@@ -485,7 +485,7 @@ NodeList Parser::parseObjType(std::ifstream& file, const std::string& objName, c
 
         }
         break;
-    case LT::eINTEGER:
+    case LT::eINTEGER: 
     case LT::eINTEGER32:
     case LT::eUINTEGER32:
     case LT::eUNSIGNED32:
@@ -578,7 +578,7 @@ NodeList Parser::parseObjType(std::ifstream& file, const std::string& objName, c
 
             _errinf.isError = true;
             _errinf.description = formError("Bad SIZE syntax", token.lexem);
-            //print_error("Bad SIZE syntax", token, type);
+            //print_error("Bad SIZE syntax", token, type)r
             //free_node(np);
             return EmptyResult;
         }
@@ -872,7 +872,7 @@ NodeList Parser::parseObjType(std::ifstream& file, const std::string& objName, c
         //free_node(np);
         //return NULL;
     }
-    return mergeParsedObjectid(np, file, moduleName);
+    return mergeParsedObjectid(np, file);
     //return merge_parse_objectid(np, fp, name);
 }
 
@@ -880,7 +880,7 @@ NodeList Parser::parseObjType(std::ifstream& file, const std::string& objName, c
 * Parses a NOTIFICATION-TYPE macro.
 * Returns 0 on error.
 */
-NodeList Parser::parseNotifType(std::ifstream& file, const std::string& objName, const std::string& moduleName)
+NodeList Parser::parseNotifType(std::ifstream& file, const std::string& objName)
 {
     //register int    type;
     //char            token[MAXTOKEN];
@@ -980,12 +980,12 @@ NodeList Parser::parseNotifType(std::ifstream& file, const std::string& objName,
         parseToken(file, token);
         //type = get_token(fp, token, MAXTOKEN);
     }
-    return mergeParsedObjectid(np, file, moduleName);
+    return mergeParsedObjectid(np, file);
     //return merge_parse_objectid(np, fp, name);
 }
 
 
-NodeList Parser::parseCompliance(std::ifstream& file, const std::string& objName, const std::string& moduleName)
+NodeList Parser::parseCompliance(std::ifstream& file, const std::string& objName)
 {
     //int             type;
     //char            token[MAXTOKEN];
@@ -1085,7 +1085,7 @@ NodeList Parser::parseCompliance(std::ifstream& file, const std::string& objName
         //type = get_token(fp, token, MAXTOKEN);
         parseToken(file, token);
 
-        if (token.type == LT::eLABEL && token.lexem != moduleName)//strcmp(token, module_name(current_module, modname)))
+        if (token.type == LT::eLABEL && token.lexem != _moduleName)//strcmp(token, module_name(current_module, modname)))
         {
 
             LoadStatus status = readModuleInternal(token.lexem);
@@ -1272,11 +1272,11 @@ NodeList Parser::parseCompliance(std::ifstream& file, const std::string& objName
     //	while (type != EQUALS && type != ENDOFFILE)
     //		type = get_token(fp, quoted_string_buffer, MAXQUOTESTR);
 
-    return mergeParsedObjectid(np, file, moduleName);
+    return mergeParsedObjectid(np, file);
     //return merge_parse_objectid(np, fp, name);
 }
 
-NodeList Parser::parseModuleIdentity(std::ifstream& file, const std::string& objName, const std::string& moduleName)
+NodeList Parser::parseModuleIdentity(std::ifstream& file, const std::string& objName)
 {
     //register int    type;
     //char            token[MAXTOKEN];
@@ -1452,7 +1452,7 @@ NodeList Parser::parseModuleIdentity(std::ifstream& file, const std::string& obj
     }
     //print_error("Expected \"::=\"", token, type);
 
-    return mergeParsedObjectid(np, file, moduleName);
+    return mergeParsedObjectid(np, file);
     //skip:
     //	while (type != EQUALS && type != ENDOFFILE)
     //	{
@@ -1465,7 +1465,7 @@ NodeList Parser::parseModuleIdentity(std::ifstream& file, const std::string& obj
 * Parses a capabilities macro
 * Returns 0 on error.
 */
-NodeList Parser::parseCapabilities(std::ifstream& file, const std::string& objName, const std::string& moduleName)
+NodeList Parser::parseCapabilities(std::ifstream& file, const std::string& objName)
 {
     //int             type;
     //char            token[MAXTOKEN];
@@ -1846,7 +1846,7 @@ NodeList Parser::parseCapabilities(std::ifstream& file, const std::string& objNa
     }
     //print_error("Expected \"::=\"", token, type);
 
-    return mergeParsedObjectid(np, file, moduleName);
+    return mergeParsedObjectid(np, file);
     //skip:
     //	while (type != EQUALS && type != ENDOFFILE)
     //	{
@@ -1859,7 +1859,7 @@ NodeList Parser::parseCapabilities(std::ifstream& file, const std::string& objNa
 * Parses an asn type.  Structures are ignored by this parser.
 * Returns NULL on error.
 */
-NodeList Parser::parseASN(std::ifstream& file, Token& token, const std::string& objName, const std::string& moduleName)
+NodeList Parser::parseASN(std::ifstream& file, Token& token, const std::string& objName)
 {
     //int             type, i;
     //char            token[MAXTOKEN];
@@ -1872,13 +1872,15 @@ NodeList Parser::parseASN(std::ifstream& file, Token& token, const std::string& 
     //np->label = objName;
     TC tc;
     //Token token;
-    int level = 0;
+    //int level = 0;
 
     parseToken(file, token);
     //type = get_token(fp, token, MAXTOKEN);
     if (token.type == LT::eSEQUENCE || token.type == LT::eCHOICE)
     {
-        //level = 0;
+        int level = 0;
+        LT lasttype = token.type;
+
         parseToken(file, token);
         while (token.type != LT::eENDOFFILE)
         {
@@ -1888,6 +1890,11 @@ NodeList Parser::parseASN(std::ifstream& file, Token& token, const std::string& 
             }
             else if (token.type == LT::eRIGHTBRACKET && --level == 0)
             {
+                tc.descriptor = objName;
+                tc.type = lasttype;
+                tc.module = _moduleName;
+                _tclist.addTC(tc);
+
                 parseToken(file, token);
                 return EmptyResult;
                 //*ntype = get_token(fp, ntoken, MAXTOKEN);
@@ -1910,7 +1917,7 @@ NodeList Parser::parseASN(std::ifstream& file, Token& token, const std::string& 
         file.unget();
         //ungetc(ch_next, fp);
 
-        auto nodes = parseObjectid(file, objName, moduleName);
+        auto nodes = parseObjectid(file, objName);
         //np = parse_objectid(fp, name);
 
         if (!nodes.empty())
@@ -2189,7 +2196,7 @@ NodeList Parser::parseASN(std::ifstream& file, Token& token, const std::string& 
             //goto err;
         }
 
-        tc.module = moduleName;
+        tc.module = _moduleName;
         tc.descriptor = objName;
         tc.type = token.type;
 
@@ -2235,7 +2242,7 @@ NodeList Parser::parseASN(std::ifstream& file, Token& token, const std::string& 
     //	return NULL;
 }
 
-NodeList Parser::parseTrap(std::ifstream& file, const std::string& objName, const std::string& moduleName)
+NodeList Parser::parseTrap(std::ifstream& file, const std::string& objName)
 {
     //register int    type;
     //char            token[MAXTOKEN];
@@ -2243,7 +2250,7 @@ NodeList Parser::parseTrap(std::ifstream& file, const std::string& objName, cons
     //register struct node *np;
     Node::Ptr np(new Node);
     np->label = objName;
-    np->modules.push_back(moduleName);
+    np->modules.push_back(_moduleName);
 
     Token token;
 
@@ -2481,14 +2488,14 @@ NodeList Parser::parseMacro(std::ifstream& file)
 Merge the parsed object identifier with the existing node.
 If there is a problem with the identifier, release the existing node.
 */
-NodeList Parser::mergeParsedObjectid(Node::Ptr& np, std::ifstream& file, const std::string& moduleName)
+NodeList Parser::mergeParsedObjectid(Node::Ptr& np, std::ifstream& file)
 {
     //struct node    *nnp;
     /*
     * printf("merge defval --> %s\n",np->defaultValue);
     */
 
-    auto res = parseObjectid(file, np->label, moduleName);
+    auto res = parseObjectid(file, np->label);
 
     if (res.empty())
     {
@@ -2499,6 +2506,8 @@ NodeList Parser::mergeParsedObjectid(Node::Ptr& np, std::ifstream& file, const s
     auto& last = res.back();
     np->parentName = last->parentName;
     np->subid = last->subid;
+    np->modules = std::move(last->modules);
+    last = np;
 
     return res;
 
@@ -2569,7 +2578,7 @@ NodeList Parser::mergeParsedObjectid(Node::Ptr& np, std::ifstream& file, const s
 *
 * Returns NULL on error.  When this happens, memory may be leaked.
 */
-NodeList Parser::parseObjectid(std::ifstream& file, const std::string& objName, const std::string& moduleName)
+NodeList Parser::parseObjectid(std::ifstream& file, const std::string& objName)
 {
     //register int    count;
     //register struct subid_ss *op, *nop;
@@ -2579,6 +2588,10 @@ NodeList Parser::parseObjectid(std::ifstream& file, const std::string& objName, 
     //struct tree    *tp;
     Node::Ptr np = nullptr;
     auto oids = parseOIDlist(file);
+
+    if (_errinf.isError)
+        return EmptyResult;
+
     NodeList res;
 
     // —четчик анонимных узлов
@@ -2654,7 +2667,7 @@ NodeList Parser::parseObjectid(std::ifstream& file, const std::string& objName, 
         np = Node::Ptr(new Node);
         np->subid = oids[0].subid;
         np->label = oids[0].label;
-        np->modules.push_back(moduleName);
+        np->modules.push_back(_moduleName);
         res.push_back(np);
         return res;
     }
@@ -2684,7 +2697,7 @@ NodeList Parser::parseObjectid(std::ifstream& file, const std::string& objName, 
 
 
         np->parentName = oids[i].label;
-        np->modules.push_back(moduleName);
+        np->modules.push_back(_moduleName);
 
         if (i == size - 2)
         {
@@ -2820,7 +2833,8 @@ std::vector<SubID> Parser::parseOIDlist(std::ifstream& file)
     //}
     parseToken(file, token);
     //type = get_token(fp, token, MAXTOKEN);
-    for (int count = 0; count < 32; count++)//, id++) //hz
+
+    while (token.type != LT::eRIGHTBRACKET && token.type != LT::eENDOFFILE)
     {
         sub.label.clear();
         sub.subid = -1;
@@ -2906,8 +2920,13 @@ std::vector<SubID> Parser::parseOIDlist(std::ifstream& file)
     }
     //print_error("Too long OID", token, type);
     //return 0;
+    if (token.type == LT::eENDOFFILE)
+    {
+        _errinf.isError = true;
+        _errinf.description = formError("Too long OID", token.lexem);
+        res.clear();
+    }
 
-    res.clear();
     return res;
 }
 
@@ -3233,7 +3252,8 @@ VarbindList Parser::parseVarbinds(std::ifstream& file)
 
 bool Parser::checkUTC(const std::string& utc)
 {
-    int len, year, month, day, hour, minute;
+    size_t len;
+    int year, month, day, hour, minute;
 
     len = utc.size();//strlen(utc);
 
@@ -3732,13 +3752,8 @@ void Parser::scanObjlist(const NodeList& root, const Module::Ptr& mp, Objgroup& 
         _errinf.isError = true;
         _errinf.description = "Unidentified objects in " + _moduleName + ":";
 
-        size_t size = objlist.size();
-
         for (auto const& obj : objlist)
             _errinf.description += " " + obj + ",";
-
-        //for (size_t i = 0; i < size; ++i)
-        //	_errinf.description += " " + objlist[i] + ",";
 
         _errinf.description.pop_back();
     }
@@ -3774,6 +3789,33 @@ void Parser::scanObjlist(const NodeList& root, const Module::Ptr& mp, Objgroup& 
     //	free(gp);
     //}
     //mibLine = oLine;
+}
+
+void Parser::resolveSyntax()
+{
+    for (auto it = _undefNodes.begin(); it != _undefNodes.end();)
+    {
+        auto index = _tclist.getTCIndex(it->syntax);
+
+        if (index >= 0)
+        {
+            it->node->type = _tclist.getTC(index).type;
+            it = _undefNodes.erase(it);
+        }
+        else
+            ++it;
+    }
+
+    if (!_undefNodes.empty())
+    {
+        _errinf.isError = true;
+        _errinf.description = "Unidentified objects in " + _moduleName + ":";
+
+        for (auto const& undefNode : _undefNodes)
+            _errinf.description += " " + undefNode.syntax + ",";
+
+        _errinf.description.pop_back();
+    }
 }
 
 std::string Parser::formError(const std::string& str, const std::string& lexem)
@@ -4185,25 +4227,7 @@ NodeList Parser::parse(std::ifstream& file)
 
 #define BETWEEN_MIBS          1
 #define IN_MIB                2
-    int             state = BETWEEN_MIBS;
-    //Node    *np, *nnp;
-    //Objgroup groups, objects, notifs;
-
-    //DEBUGMSGTL(("parse-file", "Parsing file:  %s...\n", File));
-
-    //if (last_err_module)
-    //	free(last_err_module);
-    //last_err_module = NULL;
-
-    //np = root;
-    //if (np != NULL)
-    //{
-    //	/*
-    //	* now find end of chain
-    //	*/
-    //	while (np->next)
-    //		np = np->next;
-    //}
+    int state = BETWEEN_MIBS;
 
     while (token.type != LT::eENDOFFILE)
     {
@@ -4224,19 +4248,9 @@ NodeList Parser::parse(std::ifstream& file)
                 _errinf.isError = true;
                 _errinf.description = formError("Error, END before start of MIB", token.lexem);
                 return EmptyResult;
-                //print_error("Error, END before start of MIB", NULL, type);
-                //gMibError = MODULE_SYNTAX_ERROR;
-                //result.clear();
-                //return result;
             }
             else
             {
-                //struct module  *mp;
-//#ifdef TEST
-//				printf("\nNodes for Module %s:\n", name);
-//				print_nodes(stdout, root);
-//#endif
-
                 scanObjlist(result, mp, _objgroups);
                 if (_errinf.isError)
                     return EmptyResult;
@@ -4249,6 +4263,10 @@ NodeList Parser::parse(std::ifstream& file)
                 if (_errinf.isError)
                     return EmptyResult;
 
+                resolveSyntax();
+                if (_errinf.isError)
+                    return EmptyResult;
+
                 _tree->linkUp(result);
 
                 if (!result.empty())
@@ -4257,88 +4275,29 @@ NodeList Parser::parse(std::ifstream& file)
                     _errinf.description = "Can't link up nodes of " + _moduleName;
                     return EmptyResult;
                 }
-
-                //auto it = _moduleList->_moduleList.find(moduleName);
-                //
-                //if (it != _moduleList->_moduleList.end())
-                //{
-                //}
-
-                //for (mp = module_head; mp; mp = mp->next)
-                //	if (mp->modid == current_module)
-                //		break;
-                //scan_objlist(root, mp, objgroups, "Undefined OBJECT-GROUP");
-                //scan_objlist(root, mp, objects, "Undefined OBJECT");
-                //scan_objlist(root, mp, notifs, "Undefined NOTIFICATION");
-                //objgroups = oldgroups;
-                //objects = oldobjects;
-                //notifs = oldnotifs;
-                //do_linkup(mp, root);
-                //np = root = NULL;
             }
-            state = BETWEEN_MIBS;
 
+            state = BETWEEN_MIBS;
             continue;
         case LT::eIMPORTS:
 
-            parseImports(file, moduleName);
+            parseImports(file);
 
             if (_errinf.isError)
                 return EmptyResult;
 
-            //parse_imports(fp);
             continue;
         case LT::eEXPORTS:
 
             while (token.type != LT::eSEMI && token.type != LT::eENDOFFILE)
                 parseToken(file, token);
 
-            //while (type != SEMI && type != ENDOFFILE)
-            //	type = get_LexemType(fp, LT, MAXLexemType);
             continue;
-            //case LABEL:
-            //case INTEGER:
-            //case INTEGER32:
-            //case UINTEGER32:
-            //case UNSIGNED32:
-            //case COUNTER:
-            //case COUNTER64:
-            //case GAUGE:
-            //case IPADDR:
-            //case NETADDR:
-            //case NSAPADDRESS:
-            //case OBJSYNTAX:
-            //case APPSYNTAX:
-            //case SIMPLESYNTAX:
-            //case OBJNAME:
-            //case NOTIFNAME:
-            //case KW_OPAQUE:
-            //case TIMETICKS:
-            //	break;
+
         case LT::eENDOFFILE:
             continue;
         default:
             break;
-            //strlcpy(name, LT, sizeof(name));
-            //type = get_LexemType(fp, LT, MAXLexemType);
-            //nnp = NULL;
-            //if (type == MACRO)
-            //{
-            //	nnp = parse_macro(fp, name);
-            //	if (nnp == NULL)
-            //	{
-            //		print_error("Bad parse of MACRO", NULL, type);
-            //		gMibError = MODULE_SYNTAX_ERROR;
-            //		/*
-            //		* return NULL;
-            //		*/
-            //	}
-            //	free_node(nnp); /* IGNORE */
-            //	nnp = NULL;
-            //}
-            //else
-            //	print_error(name, "is a reserved word", lasttype);
-            //continue;           /* see if we can parse the rest of the file */
         }
         name = token.lexem;
         //strlcpy(name, LT, sizeof(name));
@@ -4393,13 +4352,6 @@ NodeList Parser::parse(std::ifstream& file)
             }
             state = IN_MIB;
 
-            //auto itt = _moduleList->_moduleList.find(name);
-
-            //if (itt == _moduleList->_moduleList.end())
-            //{
-            //	//new module
-            //}
-
             while (token.type != LT::eENDOFFILE)
             {
                 parseToken(file, token);
@@ -4420,262 +4372,56 @@ NodeList Parser::parse(std::ifstream& file)
 
             mp->isParsed = true;
 
-            //current_module = which_module(name);
-            //oldgroups = objgroups;
-            //objgroups = NULL;
-            //oldobjects = objects;
-            //objects = NULL;
-            //oldnotifs = notifs;
-            //notifs = NULL;
-            //if (current_module == -1)
-            //{
-            //	new_module(name, File);
-            //	current_module = which_module(name);
-            //}
-            //DEBUGMSGTL(("parse-mibs", "Parsing MIB: %d %s\n",
-            //	current_module, name));
-            //while ((type = get_LexemType(fp, LT, MAXLexemType)) != ENDOFFILE)
-            //	if (type == BEGIN)
-            //		break;
             break;
         case LT::eOBJTYPE:
         {
-            nodes = parseObjType(file, name, moduleName);
-
-            if (_errinf.isError)
-                return EmptyResult;
-            //if (nodes.empty())
-            //{
-            //	return EmptyResult;
-            //	//result.clear();
-            //	//return result;
-            //}
-            //result.merge(nodes);
-            //nnp = parse_objecttype(fp, name);
-            //if (nnp == NULL)
-            //{
-            //	//if (!netsnmp_ds_get_boolean(NETSNMP_DS_LIBRARY_ID, NETSNMP_DS_LIB_MIB_SAVE_ERRORS))
-            //	//	print_error("Bad parse of OBJECT-TYPE", NULL, type);
-            //	gMibError = MODULE_SYNTAX_ERROR;
-            //	goto error;
-            //	//return NULL;
-            //}
+            nodes = parseObjType(file, name);
             break;
         }
         case LT::eOBJGROUP:
         {
-            nodes = parseObjectGroup(file, name, moduleName, LT::eOBJECT, _objects);
-
-            if (_errinf.isError)
-                return EmptyResult;
-            //if (nodes.empty())
-            //{
-            //	return EmptyResult;
-            //	//result.clear();
-            //	//return result;
-            //}
-            //result.merge(nodes);
-            //nnp = parse_objectgroup(fp, name, OBJECTS, &objects);
-            //if (nnp == NULL)
-            //{
-            //	//if (!netsnmp_ds_get_boolean(NETSNMP_DS_LIBRARY_ID, NETSNMP_DS_LIB_MIB_SAVE_ERRORS))
-            //	//	print_error("Bad parse of OBJECT-GROUP", NULL, type);
-            //	gMibError = MODULE_SYNTAX_ERROR;
-            //	goto error;
-            //	//return NULL;
-            //}
+            nodes = parseObjectGroup(file, name, LT::eOBJECT, _objects);
             break;
         }
         case LT::eNOTIFGROUP:
         {
-            nodes = parseObjectGroup(file, name, moduleName, LT::eNOTIFICATIONS, _notifs);
-
-            if (_errinf.isError)
-                return EmptyResult;
-            //if (nodes.empty())
-            //{
-            //	return EmptyResult;
-            //	//result.clear();
-            //	//return result;
-            //}
-            //result.merge(nodes);
-            //nnp = parse_objectgroup(fp, name, NOTIFICATIONS, &notifs);
-            //if (nnp == NULL)
-            //{
-            //	print_error("Bad parse of NOTIFICATION-GROUP", NULL, type);
-            //	gMibError = MODULE_SYNTAX_ERROR;
-            //	goto error;
-            //	//return NULL;
-            //}
+            nodes = parseObjectGroup(file, name, LT::eNOTIFICATIONS, _notifs);
             break;
         }
         case LT::eTRAPTYPE:
         {
-            nodes = parseTrap(file, name, moduleName);
-
-            if (_errinf.isError)
-                return EmptyResult;
-            //if (nodes.empty())
-            //{
-            //	return EmptyResult;
-            //	//result.clear();
-            //	//return result;
-            //}
-            //result.merge(nodes);
-
-            //nnp = parse_trapDefinition(fp, name);
-            //if (nnp == NULL)
-            //{
-            //	print_error("Bad parse of TRAP-TYPE", NULL, type);
-            //	gMibError = MODULE_SYNTAX_ERROR;
-            //	goto error;
-            //	//return NULL;
-            //}
+            nodes = parseTrap(file, name);
             break;
         }
         case LT::eNOTIFTYPE:
         {
-            nodes = parseNotifType(file, name, moduleName);
-
-            if (_errinf.isError)
-                return EmptyResult;
-            //if (nodes.empty())
-            //{
-            //	return EmptyResult;
-            //	//result.clear();
-            //	//return result;
-            //}
-            //result.merge(nodes);
-            //nnp = parse_notificationDefinition(fp, name);
-            //if (nnp == NULL)
-            //{
-            //	print_error("Bad parse of NOTIFICATION-TYPE", NULL, type);
-            //	gMibError = MODULE_SYNTAX_ERROR;
-            //	goto error;
-            //	//return NULL;
-            //}
+            nodes = parseNotifType(file, name);
             break;
         }
         case LT::eCOMPLIANCE:
         {
-            nodes = parseCompliance(file, name, moduleName);
-
-            if (_errinf.isError)
-                return EmptyResult;
-            //if (nodes.empty())
-            //{
-            //	return EmptyResult;
-            //	//result.clear();
-            //	//return result;
-            //}
-            //result.merge(nodes);
-            //nnp = parse_compliance(fp, name);
-            //if (nnp == NULL)
-            //{
-            //	print_error("Bad parse of MODULE-COMPLIANCE", NULL, type);
-            //	gMibError = MODULE_SYNTAX_ERROR;
-            //	goto error;
-            //	//return NULL;
-            //}
+            nodes = parseCompliance(file, name);
             break;
         }
         case LT::eAGENTCAP:
         {
-            nodes = parseCapabilities(file, name, moduleName);
-
-            if (_errinf.isError)
-                return EmptyResult;
-            //if (nodes.empty())
-            //{
-            //	return EmptyResult;
-            //	//result.clear();
-            //	//return result;
-            //}
-            //result.merge(nodes);
-            //nnp = parse_capabilities(fp, name);
-            //if (nnp == NULL)
-            //{
-            //	print_error("Bad parse of AGENT-CAPABILITIES", NULL, type);
-            //	gMibError = MODULE_SYNTAX_ERROR;
-            //	goto error;
-            //	//return NULL;
-            //}
+            nodes = parseCapabilities(file, name);
             break;
         }
         case LT::eMACRO:
         {
             nodes = parseMacro(file);
-
-            if (_errinf.isError)
-                return EmptyResult;
-            //if (nodes.empty())
-            //{
-            //	return EmptyResult;
-            //	//result.clear();
-            //	//return result;
-            //}
-
             nodes.clear();
-
-            //result.merge(nodes);
-
-            //nnp = parse_macro(fp, name);
-            //if (nnp == NULL)
-            //{
-            //	print_error("Bad parse of MACRO", NULL, type);
-            //	gMibError = MODULE_SYNTAX_ERROR;
-            //	/*
-            //	* return NULL;
-            //	*/
-            //}
-            //free_node(nnp);     /* IGNORE */
-            //nnp = NULL;
             break;
         }
         case LT::eMODULEIDENTITY:
         {
-            nodes = parseModuleIdentity(file, name, moduleName);
-
-            if (_errinf.isError)
-                return EmptyResult;
-            //if (nodes.empty())
-            //{
-            //	return EmptyResult;
-            //	//result.clear();
-            //	//return result;
-            //}
-            //result.merge(nodes);
-            //nnp = parse_moduleIdentity(fp, name);
-            //if (nnp == NULL)
-            //{
-            //	print_error("Bad parse of MODULE-IDENTITY", NULL, type);
-            //	gMibError = MODULE_SYNTAX_ERROR;
-            //	goto error;
-            //	//return NULL;
-            //}
+            nodes = parseModuleIdentity(file, name);
             break;
         }
         case LT::eOBJIDENTITY:
         {
-            nodes = parseObjectGroup(file, name, moduleName, LT::eOBJECT, _objects);
-
-            if (_errinf.isError)
-                return EmptyResult;
-            //if (nodes.empty())
-            //{
-            //	return EmptyResult;
-            //	//result.clear();
-            //	//return result;
-            //}
-            //result.merge(nodes);
-            //nnp = parse_objectgroup(fp, name, OBJECTS, &objects);
-            //if (nnp == NULL)
-            //{
-            //	print_error("Bad parse of OBJECT-IDENTITY", NULL, type);
-            //	gMibError = MODULE_SYNTAX_ERROR;
-            //	goto error;
-            //	//return NULL;
-            //}
+            nodes = parseObjectGroup(file, name, LT::eOBJECT, _objects);
             break;
         }
         case LT::eOBJECT:
@@ -4709,90 +4455,40 @@ NodeList Parser::parse(std::ifstream& file)
                 //return NULL;
             }
             //nnp = parse_objectid(fp, name);
-            nodes = parseObjectid(file, name, moduleName);
-
-            if (_errinf.isError)
-                return EmptyResult;
-            //if (nodes.empty())
-            //{
-            //	return EmptyResult;
-            //	//result.clear();
-            //	//return result;
-            //}
-
-            //result.merge(nodes);
-            //if (nnp == NULL)
-            //{
-            //	print_error("Bad parse of OBJECT IDENTIFIER", NULL, type);
-            //	gMibError = MODULE_SYNTAX_ERROR;
-            //	goto error;
-            //	//return NULL;
-            //}
+            nodes = parseObjectid(file, name);
             break;
         }
         case LT::eEQUALS:
         {
-            nodes = parseASN(file, token, name, moduleName);
-
-            if (_errinf.isError)
-                return EmptyResult;
-
-            //if (!nodes.empty())
-            //{
-            //	result.merge(nodes);
-            //}
-
-            //nnp = parse_asntype(fp, name, &type, LT);
+            nodes = parseASN(file, token, name);
             lasttype = LT::eCONTINUE;
             break;
         }
         case LT::eENDOFFILE:
             break;
         default:
-
             _errinf.isError = true;
             _errinf.description = formError("Bad operator", token.lexem);
             return EmptyResult;
-
-            //result.clear();
-            //return result;
-            //print_error("Bad operator", LT, type);
-            //gMibError = MODULE_SYNTAX_ERROR;
-            //goto error;
-
-            //return NULL;
         }
+
+        if (_errinf.isError)
+            return EmptyResult;
 
         if (!nodes.empty())
             result.merge(nodes);
-
-        //if (nnp)
-        //{
-        //	if (np)
-        //		np->next = nnp;
-        //	else
-        //		np = root = nnp;
-        //	while (np->next)
-        //		np = np->next;
-        //	if (np->type == TYPE_OTHER)
-        //		np->type = type;
-        //}
     }
 
     std::cout << "Loading " + _moduleName + ": OK" << std::endl;
     return result;
-    //DEBUGMSGTL(("parse-file", "End of file (%s)\n", File));
-    //return root;
-
-//error:
-//
-//	for (np = root; np; np = np->next)
-//		free_node(np);
-//
-//	return NULL;
 }
 
 const ErrorInfo& Parser::lastErrorInfo()
 {
     return _errinf;
 }
+
+Parser::UndefinedNode::UndefinedNode(const Node::Ptr& Node, const std::string& Syntax):
+    node(Node),
+    syntax(Syntax)
+{}

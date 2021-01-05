@@ -21,9 +21,7 @@ ModuleTable::ModuleTable(const std::string& folderPath)
             parser.parseToken(file, token);
 
             _modules[token.lexem] = Module::Ptr(new Module(token.lexem, entry.path().string(), {}, false));
-
         }
-
     }
 
 }

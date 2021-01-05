@@ -18,7 +18,7 @@ struct Node
     std::vector<Ptr>			children;
     Strs						modules;  /* The module containing this node */
     std::string					parentName; /* The parent's textual name */
-    Ptr						parent;
+    WPtr						parent;
     //int							tc_index = -1; /* index into tclist (-1 if NA) */
     LT							type;   /* The type of object this represents */
     LT							access;

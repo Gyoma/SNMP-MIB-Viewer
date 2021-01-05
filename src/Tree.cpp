@@ -66,25 +66,51 @@ void Tree::linkUp(NodeList& nodes)
         for (auto nodeit = nodes.begin(); nodeit != nodes.end(); )
         {
             auto const& np = *nodeit;
-            auto parent = findNode(np->parentName);
+            
+            //check that the node is not connected yet
 
-            if (parent)
+            auto tnp = findNode(np->label);
+
+            if (tnp == nullptr)
             {
-                np->parent = parent;
-                parent->children.push_back(np);
-                for (auto& moduleName : np->modules)
+                auto parent = findNode(np->parentName);
+
+                if (parent)
                 {
-                    auto mp = findModule(moduleName);
+                    np->parent = parent;
+                    parent->children.push_back(np);
 
-                    if (mp)
-                        mp->nodes[np->label] = np;
+                    for (auto& moduleName : np->modules)
+                    {
+                        auto mp = findModule(moduleName);
+
+                        if (mp)
+                            mp->nodes[np->label] = np;
+                    }
+
+                    nodeit = nodes.erase(nodeit);
+                    success = true;
                 }
-
-                nodeit = nodes.erase(nodeit);
-                success = true;
+                else
+                    ++nodeit;
             }
             else
-                ++nodeit;
+            {   
+                auto& existingModules = tnp->modules;
+                auto const& moduleName = np->modules.front();
+                size_t size = existingModules.size(), i = 0;
+
+                for (; i < size; ++i)
+                {
+                    if (existingModules[i] == moduleName)
+                        break;
+                }
+
+                if (i == size)
+                    existingModules.push_back(moduleName);
+
+                nodeit = nodes.erase(nodeit);
+            }
         }
     }
 }

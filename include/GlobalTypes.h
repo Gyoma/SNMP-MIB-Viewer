@@ -127,12 +127,9 @@ enum LT
 };
 
 
-struct Node;
-
 using Strs = std::vector<std::string>;
-
 using LexemTypeTable = std::unordered_map<std::string, LT>;
-using NodeList = std::list<std::shared_ptr<Node>>;
+using NodeList = std::list<std::shared_ptr<struct Node>>;
 using Objgroup = std::unordered_set<std::string>;
 
 struct Token
@@ -194,11 +191,4 @@ using IndexList = std::vector<Index>;
 /*
 * A linked list of varbinds
 */
-
 using VarbindList = Strs;
-
-//struct varbind
-//{
-//	struct varbind_list *next;
-//	char           *vblabel;
-//};
