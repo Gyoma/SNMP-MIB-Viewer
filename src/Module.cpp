@@ -8,7 +8,7 @@
 
 ModuleTable::ModuleTable(const std::string& folderPath)
 {
-	
+
 	for (const auto& entry : std::filesystem::directory_iterator(folderPath))
 	{
 		std::ifstream file(entry.path());
@@ -20,7 +20,7 @@ ModuleTable::ModuleTable(const std::string& folderPath)
 		{
 			parser.parseToken(file, token);
 
-			_modules[token.lexem] = Module::Ptr(new Module(token.lexem, entry.path().string(), {}));
+			_modules[token.lexem] = Module::Ptr(new Module(token.lexem, entry.path().string(), {}, false));
 
 		}
 
@@ -28,7 +28,7 @@ ModuleTable::ModuleTable(const std::string& folderPath)
 
 }
 
-Module::Ptr ModuleTable::findModule(const std::string& name)
+Module::Ptr ModuleTable::findModule(const std::string& name) const
 {
 	auto res = _modules.find(name);
 
@@ -38,15 +38,45 @@ Module::Ptr ModuleTable::findModule(const std::string& name)
 	return nullptr;
 }
 
-void ModuleTable::addModule(const Module::Ptr& module)
+Node::Ptr ModuleTable::findNode(const std::string& Name, const std::string& Module) const
 {
-	if (module)
-		_modules[module->moduleName] = module;
+	if (Module.empty())
+	{
+		for (auto const& module : _modules)
+		{
+			auto const& nodes = module.second->nodes;
+			auto node = nodes.find(Name);
+
+			if (node != nodes.end())
+				return node->second;
+		}
+	}
+	else
+	{
+		auto module = _modules.find(Module);
+
+		if (module != _modules.end())
+		{
+			auto const& nodes = module->second->nodes;
+			auto node = nodes.find(Name);
+
+			if (node != nodes.end())
+				return node->second;
+		}
+	}
+
+	return nullptr;
 }
 
-bool ModuleTable::deleteModule(const std::string& name)
+void ModuleTable::addModule(const Module::Ptr& Module)
 {
-	return _modules.erase(name);
+	if (Module)
+		_modules[Module->moduleName] = Module;
+}
+
+bool ModuleTable::deleteModule(const std::string& Name)
+{
+	return _modules.erase(Name);
 }
 
 ModuleImport::ModuleImport()
@@ -67,21 +97,26 @@ ModuleImport::ModuleImport(ModuleImport&& other) noexcept :
 {}
 
 
-Module::Module()
+Module::Module():
+	isParsed(false)
 {}
 
-Module::Module(const std::string& Module, const std::string& FileName, const std::vector<ModuleImport>& Imports) :
+Module::Module(const std::string& Module, const std::string& FileName, const std::vector<ModuleImport>& Imports, bool IsParsed) :
 	moduleName(Module),
 	fileName(FileName),
-	imports(Imports)
+	imports(Imports),
+	isParsed(IsParsed)
 {}
 
 Module::Module(const Module& other) :
-	Module(other.moduleName, other.fileName, other.imports)
+	Module(other.moduleName, other.fileName, other.imports, other.isParsed)
 {}
 
 Module::Module(Module&& other) noexcept :
 	moduleName(std::move(other.moduleName)),
 	imports(std::move(other.imports)),
-	fileName(std::move(other.fileName))
-{}
+	fileName(std::move(other.fileName)),
+	isParsed(other.isParsed)
+{
+	other.isParsed = false;
+}

@@ -9,12 +9,13 @@ public:
 
 	Tree(const ModuleTable::Ptr & ModuleTable = nullptr);
 
-	Node::Ptr findNode(const std::string& name, const std::string& module = std::string());
-	Module::Ptr findModule(const std::string& name);
+	Node::Ptr findNode(const std::string& name, const std::string& module = std::string()) const;
+	Module::Ptr findModule(const std::string& name) const;
+
+	void linkUp(NodeList& nodes);
 
 private:
 
 	Node::Ptr _root;
-	std::unordered_map<std::string, Node::Ptr> _nodeTable;
 	ModuleTable::Ptr _moduleTable;
 };

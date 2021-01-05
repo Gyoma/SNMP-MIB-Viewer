@@ -9,17 +9,20 @@ struct Node
 	using Ptr = std::shared_ptr<Node>;
 	using WPtr = std::weak_ptr<Node>;
 
-	std::vector<Ptr> children;
+	Node();
+	Node(const std::string Name, uint32_t SubID);
+
 
 	std::string					label;  /* This node's (unique) textual name */
-	unsigned long				subid = 0;  /* This node's integer subidentifier */
+	uint32_t					subid;  /* This node's integer subidentifier */
+	std::vector<Ptr>			children;
 	Strs						modules;  /* The module containing this node */
 	std::string					parentName; /* The parent's textual name */
-	WPtr						parent;
+	Ptr						parent;
 	//int							tc_index = -1; /* index into tclist (-1 if NA) */
-	LT							type = LT::eNA;   /* The type of object this represents */
-	LT							access = LT::eNA;
-	LT							status = LT::eNA;
+	LT							type;   /* The type of object this represents */
+	LT							access;
+	LT							status;
 	EnumList					enums; /* (optional) list of enumerated integers */
 	RangeList					ranges;
 	IndexList					indexes;

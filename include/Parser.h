@@ -212,7 +212,7 @@ public:
 	void tossObjectIdentifier(std::ifstream& file, Token& token);
 	void eatSyntax(std::ifstream& file, Token& token);
 
-	bool complianceLookup(const std::string& name, const std::string& moduleName);
+	bool complianceLookup(const std::string& name, const std::string& moduleName = std::string());
 
 	LoadStatus readModuleInternal(const std::string& moduleName);
 	LoadStatus readImportReplacements(const std::string& oldModuleName, Module::Imports& module);

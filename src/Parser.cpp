@@ -223,8 +223,8 @@ NodeList Parser::parseObjectGroup(std::ifstream& file, const std::string& objNam
 	//std::string obj;
 
 	//np = alloc_node(current_module);
-	if (np == nullptr)
-		return EmptyResult;
+	//if (np == nullptr)
+	//	return EmptyResult;
 
 	parseToken(file, token);
 
@@ -1097,7 +1097,7 @@ NodeList Parser::parseCompliance(std::ifstream& file, const std::string& objName
 				return EmptyResult;
 			}
 
-			module = token.lexem;
+			//module = token.lexem;
 
 			//modid = read_module_internal(token);
 			//
@@ -1138,7 +1138,7 @@ NodeList Parser::parseCompliance(std::ifstream& file, const std::string& objName
 					//goto skip;
 				}
 
-				if (!complianceLookup(token.lexem, module))
+				if (!complianceLookup(token.lexem))
 				{
 					_errinf.isError = true;
 					_errinf.description = formError("Unknown group", token.lexem);
@@ -1181,7 +1181,7 @@ NodeList Parser::parseCompliance(std::ifstream& file, const std::string& objName
 					//goto skip;
 				}
 
-				if (!complianceLookup(token.lexem, module))
+				if (!complianceLookup(token.lexem))
 				{
 					_errinf.isError = true;
 					_errinf.description = formError("Unknown group", token.lexem);
@@ -1206,7 +1206,7 @@ NodeList Parser::parseCompliance(std::ifstream& file, const std::string& objName
 					//goto skip;
 				}
 
-				if (!complianceLookup(token.lexem, moduleName))
+				if (!complianceLookup(token.lexem))
 				{
 					_errinf.isError = true;
 					_errinf.description = formError("Unknown group", token.lexem);
@@ -2499,7 +2499,6 @@ NodeList Parser::mergeParsedObjectid(Node::Ptr& np, std::ifstream& file, const s
 	auto& last = res.back();
 	np->parentName = last->parentName;
 	np->subid = last->subid;
-	last = np;
 
 	return res;
 
@@ -2616,23 +2615,18 @@ NodeList Parser::parseObjectid(std::ifstream& file, const std::string& objName, 
 
 		auto& oid = oids[0];
 
-		std::pair<std::string, int> roots[] = {
-			{ "ccitt", 0 },
-			{ "iso", 1 },
-			{ "joint-iso-ccitt", 2 }
-		};
+		//the module for the MIB roots has an empty name
+		auto mibRootsModule = _tree->findModule("");
+		auto const& roots = mibRootsModule->nodes;
 
-
-		for (size_t i = 0; i < 3; ++i)
+		for (auto const& root : roots)
 		{
-			auto const& root = roots[i];
-			if (root.second == oid.subid)
+			if (root.second->subid == oid.subid)
 			{
 				oid.label = root.first;
 				break;
 			}
 		}
-
 	}
 
 	//op = loid;
@@ -3490,7 +3484,7 @@ Parser::LoadStatus Parser::readModuleInternal(const std::string& moduleName)
 	if (mp && mp->moduleName == moduleName)
 	{
 
-		if (!mp->imports.empty())
+		if (mp->isParsed)
 			return LoadStatus::MODULE_ALREADY_LOADED;
 
 		std::ifstream file(mp->fileName);
@@ -3511,7 +3505,7 @@ Parser::LoadStatus Parser::readModuleInternal(const std::string& moduleName)
 
 		file.close();
 
-		if (res.empty() || _errinf.isError)
+		if (_errinf.isError)
 			return LoadStatus::MODULE_SYNTAX_ERROR;
 
 		return LoadStatus::MODULE_LOADED_OK;
@@ -4181,6 +4175,7 @@ NodeList Parser::parse(std::ifstream& file)
 	Token token;
 	NodeList result;
 	NodeList nodes;
+	Module::Ptr mp;
 
 	//std::string LT;
 	std::string moduleName;
@@ -4242,15 +4237,6 @@ NodeList Parser::parse(std::ifstream& file)
 //				print_nodes(stdout, root);
 //#endif
 
-				auto mp = _tree->findModule(moduleName);
-
-				if (!mp)
-				{
-					_errinf.isError = true;
-					_errinf.description = "Module " + token.lexem + " not found.";
-					return EmptyResult;
-				}
-
 				scanObjlist(result, mp, _objgroups);
 				if (_errinf.isError)
 					return EmptyResult;
@@ -4262,6 +4248,15 @@ NodeList Parser::parse(std::ifstream& file)
 				scanObjlist(result, mp, _notifs);
 				if (_errinf.isError)
 					return EmptyResult;
+
+				_tree->linkUp(result);
+
+				if (!result.empty())
+				{
+					_errinf.isError = true;
+					_errinf.description = "Can't link up nodes of " + _moduleName;
+					return EmptyResult;
+				}
 
 				//auto it = _moduleList->_moduleList.find(moduleName);
 				//
@@ -4413,6 +4408,17 @@ NodeList Parser::parse(std::ifstream& file)
 			}
 
 			_moduleName = moduleName = name;
+
+			mp = _tree->findModule(moduleName);
+
+			if (!mp)
+			{
+				_errinf.isError = true;
+				_errinf.description = "Module " + token.lexem + " not found.";
+				return EmptyResult;
+			}
+
+			mp->isParsed = true;
 
 			//current_module = which_module(name);
 			//oldgroups = objgroups;

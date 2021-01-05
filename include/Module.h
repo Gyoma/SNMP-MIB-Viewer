@@ -1,5 +1,6 @@
 #pragma once
 #include "GlobalTypes.h"
+#include "Node.h"
 #include <string>
 
 struct ModuleImport
@@ -21,13 +22,16 @@ struct Module
 
 	Module();
 	Module(const std::string& Module, const std::string& FileName, 
-		const std::vector<ModuleImport>& Imports);
+		const std::vector<ModuleImport>& Imports, bool IsParsed);
+
 	Module(const Module& other);
 	Module(Module&& other) noexcept;
 
 	const std::string	moduleName;
 	std::string			fileName;
 	Imports				imports;
+	NodeTable			nodes;
+	bool				isParsed;
 };
 
 class ModuleTable
@@ -38,9 +42,11 @@ public:
 
 	ModuleTable(const std::string& folderPath);
 	
-	Module::Ptr findModule(const std::string& name);
-	void addModule(const Module::Ptr& module);
-	bool deleteModule(const std::string& name);
+	Module::Ptr findModule(const std::string& Name) const;
+	Node::Ptr findNode(const std::string& Name, const std::string& Module = std::string()) const;
+
+	void addModule(const Module::Ptr& Module);
+	bool deleteModule(const std::string& Name);
 
 private:
 
