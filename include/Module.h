@@ -6,11 +6,14 @@
 struct ModuleImport
 {
     ModuleImport();
-    ModuleImport(const std::string& Module, const Strs& Labels);
+    ModuleImport(const std::string& ModuleName, const Strs& Labels);
     ModuleImport(const ModuleImport& other);
     ModuleImport(ModuleImport&& other) noexcept;
 
-    std::string module;  /* The module imported from */
+    ModuleImport& operator=(const ModuleImport& other);
+    ModuleImport& operator=(ModuleImport&& other) noexcept;
+
+    std::string moduleName;  /* The module imported from */
     Strs labels;  /* The descriptor being imported */
 };
 
@@ -21,8 +24,7 @@ struct Module
     using Imports = std::vector<ModuleImport>;
 
     Module();
-    Module(const std::string& Module, const std::string& FileName,
-        const std::vector<ModuleImport>& Imports, bool IsParsed);
+    Module(const std::string& ModuleName, const std::string& FileName);
 
     Module(const Module& other);
     Module(Module&& other) noexcept;
@@ -32,6 +34,7 @@ struct Module
     Imports				imports;
     NodeTable			nodes;
     bool				isParsed;
+    bool                isLinked;
 };
 
 class ModuleTable

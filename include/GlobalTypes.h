@@ -16,7 +16,6 @@ enum LT
     eBEGIN,
     eEND,
     eNA,
-    eError,
     eENDOFFILE,
     eIMPORTS,
     eEXPORTS,

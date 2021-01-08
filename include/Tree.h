@@ -13,7 +13,9 @@ public:
     Node::Ptr findNode(const std::string& name, const std::string& module = std::string()) const;
     Module::Ptr findModule(const std::string& name) const;
 
-    void linkUp(NodeList& nodes);
+    void linkupNodes(NodeList& nodes);
+    void unlinkModule(const std::string& name);
+    void linkupModule(const std::string& name);
 
     void print()
     {
@@ -31,14 +33,14 @@ private:
             std::cout << (isLeft ? "|--" : "+--");
 
             // print the value of the node
-            std::cout << (node == _root ? "-+" : node->label) << std::endl;
+            std::cout << (node == _root ? "-+" : node->label + " (" + std::to_string(node->type) + ")") << std::endl;
 
             // enter the next tree level - left and right branch
             for (int i = 0; i < (int)node->children.size() - 1; ++i)
                 print(prefix + (isLeft ? "|   " : "    "), node->children[i], true);
 
-            if(!node->children.empty())
-            print(prefix + (isLeft ? "|   " : "    "), node->children.back(), false);
+            if (!node->children.empty())
+                print(prefix + (isLeft ? "|   " : "    "), node->children.back(), false);
         }
     }
 

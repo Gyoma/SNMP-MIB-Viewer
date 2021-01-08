@@ -52,7 +52,7 @@ Module::Ptr Tree::findModule(const std::string& name) const
 
 // links up nodes to the tree
 // if the nodes are not empty after executing this method, it means a linking errorg
-void Tree::linkUp(NodeList& nodes)
+void Tree::linkupNodes(NodeList& nodes)
 {
     //in the process of parsing nodes, they will be ordered and one could use this, 
     //but this approach is generic
@@ -66,12 +66,12 @@ void Tree::linkUp(NodeList& nodes)
         for (auto nodeit = nodes.begin(); nodeit != nodes.end(); )
         {
             auto const& np = *nodeit;
-            
+
             //check that the node is not connected yet
 
             auto tnp = findNode(np->label);
 
-            if (tnp == nullptr)
+            if (tnp == nullptr || tnp->parent.expired())
             {
                 auto parent = findNode(np->parentName);
 
@@ -80,12 +80,15 @@ void Tree::linkUp(NodeList& nodes)
                     np->parent = parent;
                     parent->children.push_back(np);
 
-                    for (auto& moduleName : np->modules)
+                    if (tnp == nullptr)
                     {
-                        auto mp = findModule(moduleName);
+                        for (auto& moduleName : np->modules)
+                        {
+                            auto mp = findModule(moduleName);
 
-                        if (mp)
-                            mp->nodes[np->label] = np;
+                            if (mp)
+                                mp->nodes[np->label] = np;
+                        }
                     }
 
                     nodeit = nodes.erase(nodeit);
@@ -95,7 +98,7 @@ void Tree::linkUp(NodeList& nodes)
                     ++nodeit;
             }
             else
-            {   
+            {
                 auto& existingModules = tnp->modules;
                 auto const& moduleName = np->modules.front();
                 size_t size = existingModules.size(), i = 0;
@@ -110,6 +113,79 @@ void Tree::linkUp(NodeList& nodes)
                     existingModules.push_back(moduleName);
 
                 nodeit = nodes.erase(nodeit);
+            }
+        }
+    }
+}
+
+void Tree::unlinkModule(const std::string& moduleName)
+{
+    auto mp = findModule(moduleName);
+
+    if (mp && mp->isLinked)
+    {
+        for (auto const& nodep : mp->nodes)
+        {
+            auto const& np = nodep.second;
+            auto parent = np->parent.lock();
+
+            if (parent) //just in case
+            {
+                bool inSameModule = false;
+
+                for(auto const& module : parent->modules)
+                    if (module == moduleName)
+                    {
+                        inSameModule = true;
+                        break;
+                    }
+
+                if (!inSameModule)
+                {
+                    auto& children = np->children;
+
+                    for (auto it = children.begin(); it != children.end(); ++it)
+                        if ((*it)->label == np->label)
+                        {
+                            children.erase(it);
+                            break;
+                        }
+
+                    np->parent.reset();
+                }
+            }
+        }
+
+        mp->isLinked = false;
+    }
+}
+
+void Tree::linkupModule(const std::string& moduleName)
+{
+    auto mp = findModule(moduleName);
+
+    if (mp)
+    {
+        for (auto const& nodep : mp->nodes)
+        {
+            auto const& np = nodep.second;
+            auto parent = findNode(np->parentName);
+
+            if (parent)
+            {
+                np->parent = parent;
+                parent->children.push_back(np);
+
+                for (auto const& module : parent->modules)
+                {
+                    auto parentmp = findModule(module);
+
+                    if (parentmp && parentmp->isLinked)
+                    {
+                        mp->isLinked = true;
+                        break;
+                    }
+                }
             }
         }
     }

@@ -161,7 +161,6 @@ class Parser
         MODULE_SYNTAX_ERROR
     };
 
-    //std::shared_ptr<ModuleList> _moduleList;
     TCList _tclist;
     Tree::Ptr _tree;
 
@@ -230,7 +229,5 @@ public:
     void resolveSyntax();
 
     std::string formError(const std::string& str, const std::string& lexem);
-
-    //Error scan_objlist(const NodeList& list, std::vector<std::string>& objgroup);
 };
 

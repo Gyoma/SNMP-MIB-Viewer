@@ -77,7 +77,7 @@ void Parser::parseImports(std::ifstream& file)
             //	continue;
             //}
             //this_module = which_module(token);
-            import.module = token.lexem;
+            import.moduleName = token.lexem;
 
 
             //for (old_i = i; i < import_count; ++i)
@@ -994,6 +994,8 @@ NodeList Parser::parseCompliance(std::ifstream& file, const std::string& objName
     Node::Ptr np(new Node);
     np->label = objName;
     Token token;
+    std::string moduleName;
+    int debug = 0;
 
     //np = alloc_node(current_module);
     //if (np == NULL)
@@ -1087,8 +1089,9 @@ NodeList Parser::parseCompliance(std::ifstream& file, const std::string& objName
 
         if (token.type == LT::eLABEL && token.lexem != _moduleName)//strcmp(token, module_name(current_module, modname)))
         {
+            moduleName = token.lexem;
 
-            LoadStatus status = readModuleInternal(token.lexem);
+            LoadStatus status = readModuleInternal(moduleName);
 
             if (status != LoadStatus::MODULE_LOADED_OK && status != LoadStatus::MODULE_ALREADY_LOADED)
             {
@@ -1138,10 +1141,14 @@ NodeList Parser::parseCompliance(std::ifstream& file, const std::string& objName
                     //goto skip;
                 }
 
-                if (!complianceLookup(token.lexem))
+                if (moduleName == "SNMP-TARGET-MIB")
+                    debug = 1;
+
+                if (!complianceLookup(token.lexem, moduleName))
                 {
                     _errinf.isError = true;
-                    _errinf.description = formError("Unknown group", token.lexem);
+                    _errinf.description = formError("Unknown group", token.lexem)
+                        + "\nTry to load " + moduleName + " first";
                     return EmptyResult;
                 }
 
@@ -1181,10 +1188,11 @@ NodeList Parser::parseCompliance(std::ifstream& file, const std::string& objName
                     //goto skip;
                 }
 
-                if (!complianceLookup(token.lexem))
+                if (!complianceLookup(token.lexem, moduleName))
                 {
                     _errinf.isError = true;
-                    _errinf.description = formError("Unknown group", token.lexem);
+                    _errinf.description = formError("Unknown group", token.lexem) 
+                        + "\nTry to load " + moduleName + " first";
                     return EmptyResult;
                 }
                 //if (!compliance_lookup(token, modid))
@@ -1206,10 +1214,11 @@ NodeList Parser::parseCompliance(std::ifstream& file, const std::string& objName
                     //goto skip;
                 }
 
-                if (!complianceLookup(token.lexem))
+                if (!complianceLookup(token.lexem, moduleName))
                 {
                     _errinf.isError = true;
-                    _errinf.description = formError("Unknown group", token.lexem);
+                    _errinf.description = formError("Unknown group", token.lexem)
+                        + "\nTry to load " + moduleName + " first";
                     return EmptyResult;
                 }
                 //if (!compliance_lookup(token, modid))
@@ -1267,6 +1276,8 @@ NodeList Parser::parseCompliance(std::ifstream& file, const std::string& objName
             parseToken(file, token);
             //type = get_token(fp, token, MAXTOKEN);
         }
+
+        moduleName.clear();
     }
     //skip:
     //	while (type != EQUALS && type != ENDOFFILE)
@@ -3054,13 +3065,6 @@ RangeList Parser::parseRanges(std::ifstream& file)
             _errinf.description = formError("Expected \"(\" after SIZE", token.lexem);
             return res;
         }
-
-        //nexttype = get_token(fp, nexttoken, MAXTOKEN);
-        //if (nexttype != LEFTPAREN)
-        //{
-        //	print_error("Expected \"(\" after SIZE", nexttoken, nexttype);
-        //	return NULL;
-        //}
     }
 
     do
@@ -3203,14 +3207,6 @@ IndexList Parser::parseIndexes(std::ifstream& file)
 
 VarbindList Parser::parseVarbinds(std::ifstream& file)
 {
-    //int             type;
-    //char            token[MAXTOKEN];
-
-    //struct varbind_list* mylist = NULL;
-    //struct varbind_list** mypp = &mylist;
-
-    //free_varbinds(retp);
-
     Token token;
     VarbindList res;
 
@@ -3230,15 +3226,6 @@ VarbindList Parser::parseVarbinds(std::ifstream& file)
         if (token.type == LT::eLABEL || token.type & LT::eSYNTAX_MASK)
         {
             res.push_back(token.lexem);
-            //*mypp =
-            //	(struct varbind_list*)calloc(1,
-            //		sizeof(struct
-            //			varbind_list));
-            //if (*mypp)
-            //{
-            //	(*mypp)->vblabel = _strdup(token);
-            //	mypp = &(*mypp)->next;
-            //}
         }
 
         parseToken(file, token);
@@ -3475,35 +3462,14 @@ bool Parser::complianceLookup(const std::string& name, const std::string& module
     }
 
     return _tree->findNode(name, moduleName) != nullptr;
-
-
-    //if (modid == -1)
-    //{
-    //	struct objgroup* op =
-    //		(struct objgroup*)malloc(sizeof(struct objgroup));
-    //	if (!op)
-    //		return 0;
-    //	op->next = objgroups;
-    //	op->name = strdup(name);
-    //	op->line = mibLine;
-    //	objgroups = op;
-    //	return 1;
-    //}
-    //else
-    //	return find_tree_node(name, modid) != NULL;
 }
 
 Parser::LoadStatus Parser::readModuleInternal(const std::string& moduleName)
 {
-    //struct module* mp;
-    //FILE* fp;
-    //struct node* np;
-
     auto mp = _tree->findModule(moduleName);
 
     if (mp && mp->moduleName == moduleName)
     {
-
         if (mp->isParsed)
             return LoadStatus::MODULE_ALREADY_LOADED;
 
@@ -3533,61 +3499,10 @@ Parser::LoadStatus Parser::readModuleInternal(const std::string& moduleName)
     }
 
     return LoadStatus::MODULE_NOT_FOUND;
-
-    //	for (mp = module_head; mp; mp = mp->next)
-    //		if (!label_compare(mp->name, name))
-    //		{
-    //			const char* oldFile = File;
-    //			int             oldLine = mibLine;
-    //			int             oldModule = current_module;
-    //
-    //			if (mp->no_imports != -1)
-    //			{
-    //				DEBUGMSGTL(("parse-mibs", "Module %s already loaded\n",
-    //					name));
-    //				return MODULE_ALREADY_LOADED;
-    //			}
-    //			if ((fp = fopen(mp->file, "r")) == NULL)
-    //			{
-    //				int rval;
-    //				if (errno == ENOTDIR || errno == ENOENT)
-    //					rval = MODULE_NOT_FOUND;
-    //				else
-    //					rval = MODULE_LOAD_FAILED;
-    //				snmp_log_perror(mp->file);
-    //				return rval;
-    //			}
-    //#ifdef HAVE_FLOCKFILE
-    //			flockfile(fp);
-    //#endif
-    //			mp->no_imports = 0; /* Note that we've read the file */
-    //			File = mp->file;
-    //			mibLine = 1;
-    //			current_module = mp->modid;
-    //			/*
-    //			 * Parse the file
-    //			 */
-    //			np = parse(fp, NULL);
-    //#ifdef HAVE_FUNLOCKFILE
-    //			funlockfile(fp);
-    //#endif
-    //			fclose(fp);
-    //			File = oldFile;
-    //			mibLine = oldLine;
-    //			current_module = oldModule;
-    //			if ((np == NULL) && (gMibError == MODULE_SYNTAX_ERROR))
-    //				return MODULE_SYNTAX_ERROR;
-    //			return MODULE_LOADED_OK;
-    //		}
-    //
-    //	return MODULE_NOT_FOUND;
-
 }
 
 Parser::LoadStatus Parser::readImportReplacements(const std::string& oldModuleName, Module::Imports& imports)
 {
-    //struct module_compatability* mcp;
-
     /*
      * Look for matches first
      */
@@ -3614,7 +3529,7 @@ Parser::LoadStatus Parser::readImportReplacements(const std::string& oldModuleNa
                     {
                         size_t sizeImports = imports.size();
                         for (size_t k = 0; k < sizeImports; ++k)
-                            if (imports[k].module == mc.newModule)
+                            if (imports[k].moduleName == mc.newModule)
                             {
                                 imports[k].labels.push_back(label);
                                 import.labels.erase(import.labels.begin() + i);
@@ -3632,40 +3547,6 @@ Parser::LoadStatus Parser::readImportReplacements(const std::string& oldModuleNa
     }
 
     return readModuleReplacements(oldModuleName);
-
-    //for (mcp = module_map_head; mcp; mcp = mcp->next)
-    //{
-    //	if (!label_compare(mcp->old_module, old_module_name))
-    //	{
-    //
-    //		if (                /* exact match */
-    //			(mcp->tag_len == 0 && (mcp->tag == NULL || !label_compare(mcp->tag, identifier->label))) ||
-    //			/*
-    //			 * prefix match
-    //			 */
-    //			(mcp->tag_len != 0 && !strncmp(mcp->tag, identifier->label, mcp->tag_len))
-    //			)
-    //		{
-    //
-    //			if (netsnmp_ds_get_int(NETSNMP_DS_LIBRARY_ID,
-    //				NETSNMP_DS_LIB_MIB_WARNINGS))
-    //			{
-    //				snmp_log(LOG_WARNING,
-    //					"Importing %s from replacement module %s instead of %s (%s)\n",
-    //					identifier->label, mcp->new_module,
-    //					old_module_name, File);
-    //			}
-    //			(void)netsnmp_read_module(mcp->new_module);
-    //			identifier->modid = which_module(mcp->new_module);
-    //			return 1;         /* finished! */
-    //		}
-    //	}
-    //}
-    //
-    ///*
-    // * If no exact match, load everything relevant
-    // */
-    //return read_module_replacements(old_module_name);
 }
 
 Parser::LoadStatus Parser::readModuleReplacements(const std::string& oldModuleName)
@@ -3683,30 +3564,10 @@ Parser::LoadStatus Parser::readModuleReplacements(const std::string& oldModuleNa
     }
 
     return LoadStatus::MODULE_NOT_FOUND;
-
-    //struct module_compatability* mcp;
-
-    //for (mcp = module_map_head; mcp; mcp = mcp->next)
-    //{
-    //	if (!label_compare(mcp->old_module, name))
-    //	{
-    //		if (netsnmp_ds_get_int(NETSNMP_DS_LIBRARY_ID,
-    //			NETSNMP_DS_LIB_MIB_WARNINGS))
-    //		{
-    //			snmp_log(LOG_WARNING,
-    //				"Loading replacement module %s for %s (%s)\n",
-    //				mcp->new_module, name, File);
-    //		}
-    //		(void)netsnmp_read_module(mcp->new_module);
-    //		return 1;
-    //	}
-    //}
-    //return 0;
 }
 
 void Parser::scanObjlist(const NodeList& root, const Module::Ptr& mp, Objgroup& objlist)
 {
-
     for (auto it = objlist.begin(); it != objlist.end(); )
     {
         bool found = false;
@@ -3757,38 +3618,6 @@ void Parser::scanObjlist(const NodeList& root, const Module::Ptr& mp, Objgroup& 
 
         _errinf.description.pop_back();
     }
-
-    //int             oLine = mibLine;
-
-    //while (list)
-    //{
-    //	struct objgroup* gp = list;
-    //	struct node* np;
-    //	list = list->next;
-    //	np = root;
-    //	while (np)
-    //		if (label_compare(np->label, gp->name))
-    //			np = np->next;
-    //		else
-    //			break;
-    //	if (!np)
-    //	{
-    //		int i;
-    //		struct module_import* mip;
-    //		/* if not local, check if it was IMPORTed */
-    //		for (i = 0, mip = mp->imports; i < mp->no_imports; i++, mip++)
-    //			if (strcmp(mip->label, gp->name) == 0)
-    //				break;
-    //		if (i == mp->no_imports)
-    //		{
-    //			mibLine = gp->line;
-    //			print_error(error, gp->name, QUOTESTRING);
-    //		}
-    //	}
-    //	free(gp->name);
-    //	free(gp);
-    //}
-    //mibLine = oLine;
 }
 
 void Parser::resolveSyntax()
@@ -3824,52 +3653,10 @@ std::string Parser::formError(const std::string& str, const std::string& lexem)
     return str + " (" + lexem + "): At line " + std::to_string(_line) + " in " + _moduleName;
 }
 
-//Error Parser::scan_objlist(const NodeList& list, std::vector<std::string>& objgroup)
-//{
-//
-//
-//	while (list)
-//	{
-//		struct objgroup *gp = list;
-//		struct node    *np;
-//		list = list->next;
-//		np = root;
-//		while (np)
-//			if (label_compare(np->label, gp->name))
-//				np = np->next;
-//			else
-//				break;
-//		if (!np)
-//		{
-//			int i;
-//			struct module_import *mip;
-//			/* if not local, check if it was IMPORTed */
-//			for (i = 0, mip = mp->imports; i < mp->no_imports; i++, mip++)
-//				if (strcmp(mip->label, gp->name) == 0)
-//					break;
-//			if (i == mp->no_imports)
-//			{
-//				mibLine = gp->line;
-//				print_error(error, gp->name, QUOTESTRING);
-//			}
-//		}
-//		free(gp->name);
-//		free(gp);
-//	}
-//	mibLine = oLine;
-//}
-
-
 void Parser::parseToken(std::ifstream& file, Token& token)
 {
-    char ch;// , ch_next;
-    //register char  *cp = token;
-    //register int    hash = 0;
-    //register struct tok *tp;
-    //int             too_long = 0;
-
+    char ch;
     enum { bdigits, xdigits, other } seenSymbols;
-
     bool more = true;
 
     while (more)
@@ -4061,15 +3848,13 @@ void Parser::parseToken(std::ifstream& file, Token& token)
                 file.unget();
                 token.type = LT::eLABEL;
                 return;
-                //ungetc(ch_next, fp);
-                //return LABEL;
             }
             token.type = LT::eEQUALS;
             return;
-            //return EQUALS;
+
         case '-':
             ch = file.get();
-            //ch_next = netsnmp_getc(fp);
+
             if (ch == '-')
             {
                 token.lexem += ch;
@@ -4081,8 +3866,6 @@ void Parser::parseToken(std::ifstream& file, Token& token)
 
                 more = true;
                 continue;
-                //parseToken(file, token);
-                //return;
             }
             file.unget();
             //ungetc(ch_next, fp);
@@ -4121,9 +3904,6 @@ void Parser::parseToken(std::ifstream& file, Token& token)
 
                     if (ch == '\n')
                         ++_line;
-
-                    /*if (ch_next == '\n')
-                        mibLine++;*/
 
                     if (ch == EOF)
                     {
@@ -4179,23 +3959,8 @@ void Parser::parseQuoteString(std::ifstream& file, Token& token)
 
         token.lexem += ch;
 
-        //formatted_quote << ch;
-
-        //token.lexem += ch;
-
         if (ch == '"')
         {
-            //std::stringstream formatted_quote(token.lexem);
-            //std::string word;
-            //token.lexem.clear();
-
-
-            //while (formatted_quote >> word)
-            //{
-            //	token.lexem += word + ' ';
-            //}
-            //token.lexem.pop_back();
-
             token.type = LT::eQUOTESTRING;
             return;
         }
@@ -4220,7 +3985,6 @@ NodeList Parser::parse(std::ifstream& file)
     Module::Ptr mp;
 
     //std::string LT;
-    std::string moduleName;
     std::string name;
 
     LT lasttype = LT::eLABEL;
@@ -4267,7 +4031,7 @@ NodeList Parser::parse(std::ifstream& file)
                 if (_errinf.isError)
                     return EmptyResult;
 
-                _tree->linkUp(result);
+                _tree->linkupNodes(result);
 
                 if (!result.empty())
                 {
@@ -4359,9 +4123,9 @@ NodeList Parser::parse(std::ifstream& file)
                     break;
             }
 
-            _moduleName = moduleName = name;
+            _moduleName = name;
 
-            mp = _tree->findModule(moduleName);
+            mp = _tree->findModule(_moduleName);
 
             if (!mp)
             {
@@ -4369,6 +4133,9 @@ NodeList Parser::parse(std::ifstream& file)
                 _errinf.description = "Module " + token.lexem + " not found.";
                 return EmptyResult;
             }
+
+            if (mp->isParsed)
+                return EmptyResult;
 
             mp->isParsed = true;
 
@@ -4476,7 +4243,8 @@ NodeList Parser::parse(std::ifstream& file)
             return EmptyResult;
 
         if (!nodes.empty())
-            result.merge(nodes);
+            result.splice(result.end(), std::move(nodes));
+
     }
 
     std::cout << "Loading " + _moduleName + ": OK" << std::endl;

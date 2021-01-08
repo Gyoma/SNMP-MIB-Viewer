@@ -5,7 +5,11 @@ set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 set(PROJECT_NAME netsnmp-parser)
 project(${PROJECT_NAME})
 
-set(CMAKE_CXX_STAANDARD 17)
+if(MSVC)
+	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /std:c++17")
+else()
+	set(CMAKE_CXX_STAANDARD 17)
+endif(MSVC)
 
 set(CMAKE_INLCUDE_CURRENT_DIR ON)
 

@@ -20,7 +20,7 @@ ModuleTable::ModuleTable(const std::string& folderPath)
         {
             parser.parseToken(file, token);
 
-            _modules[token.lexem] = Module::Ptr(new Module(token.lexem, entry.path().string(), {}, false));
+            _modules[token.lexem] = Module::Ptr(new Module(token.lexem, entry.path().string()));
         }
     }
 
@@ -80,41 +80,72 @@ bool ModuleTable::deleteModule(const std::string& Name)
 ModuleImport::ModuleImport()
 {}
 
-ModuleImport::ModuleImport(const std::string& Module, const Strs& Labels) :
-    module(Module),
+ModuleImport::ModuleImport(const std::string& ModuleName, const Strs& Labels) :
+    moduleName(ModuleName),
     labels(Labels)
 {}
 
 ModuleImport::ModuleImport(const ModuleImport& other) :
-    ModuleImport(other.module, other.labels)
+    ModuleImport(other.moduleName, other.labels)
 {}
 
 ModuleImport::ModuleImport(ModuleImport&& other) noexcept :
-    module(std::move(other.module)),
+    moduleName(std::move(other.moduleName)),
     labels(std::move(other.labels))
 {}
 
+ModuleImport& ModuleImport::operator=(const ModuleImport & other)
+{
+    if (this != &other)
+    {
+        moduleName = other.moduleName;
+        labels = other.labels;
+    }
+
+    return *this;
+}
+
+ModuleImport& ModuleImport::operator=(ModuleImport&& other) noexcept
+{
+    if (this != &other)
+    {
+        moduleName = std::move(other.moduleName);
+        labels = std::move(other.labels);
+    }
+
+    return *this;
+}
+
 
 Module::Module() :
-    isParsed(false)
+    isParsed(false),
+    isLinked(false)
 {}
 
-Module::Module(const std::string& Module, const std::string& FileName, const std::vector<ModuleImport>& Imports, bool IsParsed) :
-    moduleName(Module),
+Module::Module(const std::string& ModuleName, const std::string& FileName) :
+    moduleName(ModuleName),
     fileName(FileName),
-    imports(Imports),
-    isParsed(IsParsed)
+    isParsed(false),
+    isLinked(false)
 {}
 
 Module::Module(const Module& other) :
-    Module(other.moduleName, other.fileName, other.imports, other.isParsed)
-{}
+    Module(other.moduleName, other.fileName)
+{
+    imports = other.imports;
+    isParsed = other.isParsed;
+    isLinked = other.isLinked;
+    nodes = other.nodes;
+}
 
 Module::Module(Module&& other) noexcept :
     moduleName(std::move(other.moduleName)),
     imports(std::move(other.imports)),
+    nodes(std::move(other.nodes)),
     fileName(std::move(other.fileName)),
-    isParsed(other.isParsed)
+    isParsed(other.isParsed),
+    isLinked(other.isLinked)
 {
     other.isParsed = false;
+    other.isLinked = false;
 }
