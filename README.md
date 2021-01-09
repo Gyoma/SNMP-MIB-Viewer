@@ -1,1 +1,1 @@
-netsnmp_parser
+SNMP-MIB-Parser
