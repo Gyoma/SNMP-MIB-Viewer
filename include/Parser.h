@@ -184,7 +184,7 @@ public:
 
     Parser(Tree::Ptr tree = nullptr);
 
-    NodeList parse(std::ifstream& file);
+    void parse(std::ifstream& file);
     const ErrorInfo& lastErrorInfo();
 
 public:

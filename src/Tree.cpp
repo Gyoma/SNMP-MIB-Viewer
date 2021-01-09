@@ -87,7 +87,10 @@ void Tree::linkupNodes(NodeList& nodes)
                             auto mp = findModule(moduleName);
 
                             if (mp)
+                            {
                                 mp->nodes[np->label] = np;
+                                mp->isLinked = true;
+                            }
                         }
                     }
 
@@ -142,7 +145,7 @@ void Tree::unlinkModule(const std::string& moduleName)
 
                 if (!inSameModule)
                 {
-                    auto& children = np->children;
+                    auto& children = parent->children;
 
                     for (auto it = children.begin(); it != children.end(); ++it)
                         if ((*it)->label == np->label)
@@ -169,21 +172,31 @@ void Tree::linkupModule(const std::string& moduleName)
         for (auto const& nodep : mp->nodes)
         {
             auto const& np = nodep.second;
-            auto parent = findNode(np->parentName);
 
-            if (parent)
+            if (np->parent.lock() == nullptr)
             {
-                np->parent = parent;
-                parent->children.push_back(np);
+                auto parent = findNode(np->parentName);
 
-                for (auto const& module : parent->modules)
+                if (parent)
                 {
-                    auto parentmp = findModule(module);
+                    np->parent = parent;
+                    parent->children.push_back(np);
 
-                    if (parentmp && parentmp->isLinked)
+                    for (auto const& module : parent->modules)
                     {
-                        mp->isLinked = true;
-                        break;
+                        auto parentmp = findModule(module);
+
+                        if (parentmp)
+                        {
+                            if (!parentmp->isLinked)
+                                linkupModule(module);
+
+                            if(parentmp->isLinked)
+                            {
+                                mp->isLinked = true;
+                                //break;
+                            }
+                        }
                     }
                 }
             }

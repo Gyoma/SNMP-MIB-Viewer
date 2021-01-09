@@ -485,7 +485,7 @@ NodeList Parser::parseObjType(std::ifstream& file, const std::string& objName)
 
         }
         break;
-    case LT::eINTEGER: 
+    case LT::eINTEGER:
     case LT::eINTEGER32:
     case LT::eUINTEGER32:
     case LT::eUNSIGNED32:
@@ -1191,7 +1191,7 @@ NodeList Parser::parseCompliance(std::ifstream& file, const std::string& objName
                 if (!complianceLookup(token.lexem, moduleName))
                 {
                     _errinf.isError = true;
-                    _errinf.description = formError("Unknown group", token.lexem) 
+                    _errinf.description = formError("Unknown group", token.lexem)
                         + "\nTry to load " + moduleName + " first";
                     return EmptyResult;
                 }
@@ -3484,7 +3484,7 @@ Parser::LoadStatus Parser::readModuleInternal(const std::string& moduleName)
         _line = 1;
         _moduleName = moduleName;
 
-        auto res = parse(file);
+        parse(file);
 
         _line = oldLine;
         _moduleName = std::move(oldModule);
@@ -3942,19 +3942,24 @@ void Parser::parseToken(std::ifstream& file, Token& token)
 void Parser::parseQuoteString(std::ifstream& file, Token& token)
 {
     //token.lexem.clear();
+    bool newLine = false;
 
     for (char ch = file.get(); ch != EOF; ch = file.get())
     {
+        if (ch == '\r')
+            continue;
+
         if (ch == '\n')
         {
-            if (token.lexem.back() != ' ')
-                token.lexem += ' ';
-
+            newLine = true;
             ++_line;
-            continue;
         }
+        else if (newLine && (ch == ' ' || ch == '\t'))
+            continue;
+        else
+            newLine = false;
 
-        if (ch == '\r' || (token.lexem.back() == ' ' && ch == ' '))
+        if (ch == ' ' && token.lexem.back() == ' ')
             continue;
 
         token.lexem += ch;
@@ -3969,7 +3974,7 @@ void Parser::parseQuoteString(std::ifstream& file, Token& token)
     token.type = LT::eENDOFFILE;
 }
 
-NodeList Parser::parse(std::ifstream& file)
+void Parser::parse(std::ifstream& file)
 {
     //char            LT[MAXLexemType];
     //char            name[MAXLexemType + 1];
@@ -4011,25 +4016,25 @@ NodeList Parser::parse(std::ifstream& file)
             {
                 _errinf.isError = true;
                 _errinf.description = formError("Error, END before start of MIB", token.lexem);
-                return EmptyResult;
+                return;
             }
             else
             {
                 scanObjlist(result, mp, _objgroups);
                 if (_errinf.isError)
-                    return EmptyResult;
+                    return;
 
                 scanObjlist(result, mp, _objects);
                 if (_errinf.isError)
-                    return EmptyResult;
+                    return;
 
                 scanObjlist(result, mp, _notifs);
                 if (_errinf.isError)
-                    return EmptyResult;
+                    return;
 
                 resolveSyntax();
                 if (_errinf.isError)
-                    return EmptyResult;
+                    return;
 
                 _tree->linkupNodes(result);
 
@@ -4037,7 +4042,7 @@ NodeList Parser::parse(std::ifstream& file)
                 {
                     _errinf.isError = true;
                     _errinf.description = "Can't link up nodes of " + _moduleName;
-                    return EmptyResult;
+                    return;
                 }
             }
 
@@ -4048,7 +4053,7 @@ NodeList Parser::parse(std::ifstream& file)
             parseImports(file);
 
             if (_errinf.isError)
-                return EmptyResult;
+                return;
 
             continue;
         case LT::eEXPORTS:
@@ -4085,7 +4090,7 @@ NodeList Parser::parse(std::ifstream& file)
             {
                 _errinf.isError = true;
                 _errinf.description = formError("Expected \"}\"", token.lexem);
-                return EmptyResult;
+                return;
                 //result.clear();
                 //return result;
                 //print_error("Expected \"}\"", LT, type);
@@ -4106,7 +4111,7 @@ NodeList Parser::parse(std::ifstream& file)
             {
                 _errinf.isError = true;
                 _errinf.description = formError("Error, nested MIBS", token.lexem);
-                return EmptyResult;
+                return;
                 //result.clear();
                 //return result;
                 //print_error("Error, nested MIBS", NULL, type);
@@ -4131,11 +4136,11 @@ NodeList Parser::parse(std::ifstream& file)
             {
                 _errinf.isError = true;
                 _errinf.description = "Module " + token.lexem + " not found.";
-                return EmptyResult;
+                return;
             }
 
             if (mp->isParsed)
-                return EmptyResult;
+                return;
 
             mp->isParsed = true;
 
@@ -4199,7 +4204,7 @@ NodeList Parser::parse(std::ifstream& file)
             {
                 _errinf.isError = true;
                 _errinf.description = formError("Expected IDENTIFIER", token.lexem);
-                return EmptyResult;
+                return;
                 //result.clear();
                 //return result;
                 //print_error("Expected IDENTIFIER", LT, type);
@@ -4213,7 +4218,7 @@ NodeList Parser::parse(std::ifstream& file)
             {
                 _errinf.isError = true;
                 _errinf.description = formError("Expected \"::=\"", token.lexem);
-                return EmptyResult;
+                return;
                 //result.clear();
                 //return result;
                 //print_error("Expected \"::=\"", LT, type);
@@ -4236,11 +4241,11 @@ NodeList Parser::parse(std::ifstream& file)
         default:
             _errinf.isError = true;
             _errinf.description = formError("Bad operator", token.lexem);
-            return EmptyResult;
+            return;
         }
 
         if (_errinf.isError)
-            return EmptyResult;
+            return;
 
         if (!nodes.empty())
             result.splice(result.end(), std::move(nodes));
@@ -4248,7 +4253,7 @@ NodeList Parser::parse(std::ifstream& file)
     }
 
     std::cout << "Loading " + _moduleName + ": OK" << std::endl;
-    return result;
+    return;
 }
 
 const ErrorInfo& Parser::lastErrorInfo()
@@ -4256,7 +4261,7 @@ const ErrorInfo& Parser::lastErrorInfo()
     return _errinf;
 }
 
-Parser::UndefinedNode::UndefinedNode(const Node::Ptr& Node, const std::string& Syntax):
+Parser::UndefinedNode::UndefinedNode(const Node::Ptr& Node, const std::string& Syntax) :
     node(Node),
     syntax(Syntax)
 {}
