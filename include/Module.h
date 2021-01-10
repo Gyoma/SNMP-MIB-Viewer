@@ -1,7 +1,5 @@
 #pragma once
-#include "GlobalTypes.h"
-#include "Node.h"
-#include <string>
+#include <Node.h>
 
 struct ModuleImport
 {

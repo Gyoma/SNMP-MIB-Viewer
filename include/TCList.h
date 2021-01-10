@@ -1,7 +1,5 @@
 #pragma once
-#include "GlobalTypes.h"
-#include <string>
-#include <vector>
+#include <GlobalTypes.h>
 
 
 struct TC

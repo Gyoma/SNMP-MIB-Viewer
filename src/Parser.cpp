@@ -1,8 +1,8 @@
-#include "Parser.h"
-#include <iostream>
+#include <Parser.h>
+#include <fstream>
 
 
-Parser::Parser(Tree::Ptr tree) :
+Parser::Parser(TreeModel::Ptr tree) :
     _tree(tree),
     _line(0)
 {}
@@ -3649,7 +3649,7 @@ void Parser::resolveSyntax()
 
 std::string Parser::formError(const std::string& str, const std::string& lexem)
 {
-    std::cout << "Loading " + _moduleName + ": ERROR" << std::endl;
+    //std::cout << "Loading " + _moduleName + ": ERROR" << std::endl;
     return str + " (" + lexem + "): At line " + std::to_string(_line) + " in " + _moduleName;
 }
 
@@ -4252,7 +4252,7 @@ void Parser::parse(std::ifstream& file)
 
     }
 
-    std::cout << "Loading " + _moduleName + ": OK" << std::endl;
+    //std::cout << "Loading " + _moduleName + ": OK" << std::endl;
     return;
 }
 

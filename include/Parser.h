@@ -1,13 +1,6 @@
 #pragma once
-#include "GlobalTypes.h"
-#include "Module.h"
-#include "TCList.h"
-#include "Tree.h"
-#include <string>
-#include <fstream>
-#include <memory>
-#include <list>
-#include <vector>
+#include <TCList.h>
+#include <TreeModel.h>
 
 class Parser
 {
@@ -162,7 +155,7 @@ class Parser
     };
 
     TCList _tclist;
-    Tree::Ptr _tree;
+    TreeModel::Ptr _tree;
 
     Objgroup _objgroups, _objects, _notifs;
     ErrorInfo _errinf;
@@ -182,7 +175,9 @@ class Parser
 
 public:
 
-    Parser(Tree::Ptr tree = nullptr);
+    using Ptr = std::shared_ptr<Parser>;
+
+    Parser(TreeModel::Ptr tree = nullptr);
 
     void parse(std::ifstream& file);
     const ErrorInfo& lastErrorInfo();

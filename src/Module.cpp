@@ -1,6 +1,4 @@
-#include "Parser.h"
-#include "Module.h"
-#include <iostream>
+#include <Parser.h>
 #include <filesystem>
 #include <fstream>
 
@@ -8,21 +6,21 @@
 
 ModuleTable::ModuleTable(const std::string& folderPath)
 {
-
-    for (const auto& entry : std::filesystem::directory_iterator(folderPath))
-    {
-        std::ifstream file(entry.path());
-        Parser parser;
-        Token token;
-        Module module;
-
-        if (file.is_open())
+    if (!folderPath.empty())
+        for (const auto& entry : std::filesystem::directory_iterator(folderPath))
         {
-            parser.parseToken(file, token);
+            std::ifstream file(entry.path());
+            Parser parser;
+            Token token;
+            Module module;
 
-            _modules[token.lexem] = Module::Ptr(new Module(token.lexem, entry.path().string()));
+            if (file.is_open())
+            {
+                parser.parseToken(file, token);
+
+                _modules[token.lexem] = Module::Ptr(new Module(token.lexem, entry.path().string()));
+            }
         }
-    }
 
 }
 
@@ -94,7 +92,7 @@ ModuleImport::ModuleImport(ModuleImport&& other) noexcept :
     labels(std::move(other.labels))
 {}
 
-ModuleImport& ModuleImport::operator=(const ModuleImport & other)
+ModuleImport& ModuleImport::operator=(const ModuleImport& other)
 {
     if (this != &other)
     {
