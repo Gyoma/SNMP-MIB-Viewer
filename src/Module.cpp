@@ -4,24 +4,9 @@
 
 
 
-ModuleTable::ModuleTable(const std::string& folderPath)
+ModuleTable::ModuleTable(const Strs& ModulesPaths)
 {
-    if (!folderPath.empty())
-        for (const auto& entry : std::filesystem::directory_iterator(folderPath))
-        {
-            std::ifstream file(entry.path());
-            Parser parser;
-            Token token;
-            Module module;
-
-            if (file.is_open())
-            {
-                parser.parseToken(file, token);
-
-                _modules[token.lexem] = Module::Ptr(new Module(token.lexem, entry.path().string()));
-            }
-        }
-
+    //updateModuleInfo(ModulesPaths);
 }
 
 Module::Ptr ModuleTable::findModule(const std::string& name) const
@@ -36,24 +21,21 @@ Module::Ptr ModuleTable::findModule(const std::string& name) const
 
 Node::Ptr ModuleTable::findNode(const std::string& Name, const std::string& Module) const
 {
-    if (Module.empty())
+    auto module = _modules.find(Module);
+
+    if (module != _modules.end())
+    {
+        auto const& nodes = module->second->nodes;
+        auto node = nodes.find(Name);
+
+        if (node != nodes.end())
+            return node->second;
+    }
+    else
     {
         for (auto const& module : _modules)
         {
             auto const& nodes = module.second->nodes;
-            auto node = nodes.find(Name);
-
-            if (node != nodes.end())
-                return node->second;
-        }
-    }
-    else
-    {
-        auto module = _modules.find(Module);
-
-        if (module != _modules.end())
-        {
-            auto const& nodes = module->second->nodes;
             auto node = nodes.find(Name);
 
             if (node != nodes.end())
@@ -70,9 +52,21 @@ void ModuleTable::addModule(const Module::Ptr& Module)
         _modules[Module->moduleName] = Module;
 }
 
-bool ModuleTable::deleteModule(const std::string& Name)
+bool ModuleTable::removeModule(const std::string& Name)
 {
     return _modules.erase(Name);
+}
+
+void ModuleTable::updateModuleInfo(const ModuleInfo::Ptr& ModuleInfo)
+{
+    auto module = findModule(ModuleInfo->moduleName);
+
+    if (module)
+    {
+        module->fileName = ModuleInfo->modulePath;
+    }
+    else
+        addModule(Module::Ptr(new Module(ModuleInfo->moduleName, ModuleInfo->modulePath)));
 }
 
 ModuleImport::ModuleImport()
@@ -114,18 +108,17 @@ ModuleImport& ModuleImport::operator=(ModuleImport&& other) noexcept
     return *this;
 }
 
-
-Module::Module() :
-    isParsed(false),
-    isLinked(false)
-{}
-
 Module::Module(const std::string& ModuleName, const std::string& FileName) :
     moduleName(ModuleName),
     fileName(FileName),
     isParsed(false),
     isLinked(false)
 {}
+
+Module::~Module()
+{
+    isLinked = false;
+}
 
 Module::Module(const Module& other) :
     Module(other.moduleName, other.fileName)
@@ -146,4 +139,53 @@ Module::Module(Module&& other) noexcept :
 {
     other.isParsed = false;
     other.isLinked = false;
+}
+
+ModuleInfo::ModuleInfo(const std::string& ModuleName, std::string ModulePath, bool NeedToLoad, const Strs& ModuleImprots) :
+    moduleName(ModuleName),
+    modulePath(ModulePath),
+    moduleImports(ModuleImprots),
+    needToLoad(NeedToLoad)
+{}
+
+ModuleInfo::ModuleInfo(const ModuleInfo& other) :
+    ModuleInfo(other.moduleName,
+        other.modulePath,
+        other.needToLoad,
+        other.moduleImports)
+{}
+
+ModuleInfo::ModuleInfo(ModuleInfo&& other) noexcept
+{
+    moduleName = std::move(other.moduleName);
+    modulePath = std::move(other.modulePath);
+    moduleImports = std::move(other.moduleImports);
+    needToLoad = other.needToLoad;
+    other.needToLoad = false;
+}
+
+ModuleInfo& ModuleInfo::operator=(const ModuleInfo& other)
+{
+    if (this != &other)
+    {
+        moduleName = other.moduleName;
+        modulePath = other.modulePath;
+        needToLoad = other.needToLoad;
+    }
+
+    return *this;
+}
+
+ModuleInfo& ModuleInfo::operator=(ModuleInfo&& other) noexcept
+{
+    if (this != &other)
+    {
+        moduleName = std::move(other.moduleName);
+        modulePath = std::move(other.modulePath);
+        moduleImports = std::move(other.moduleImports);
+        needToLoad = other.needToLoad;
+        other.needToLoad = false;
+    }
+
+    return *this;
 }

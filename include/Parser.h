@@ -1,6 +1,8 @@
 #pragma once
 #include <TCList.h>
-#include <TreeModel.h>
+#include <Module.h>
+
+class TreeModel;
 
 class Parser
 {
@@ -155,7 +157,7 @@ class Parser
     };
 
     TCList _tclist;
-    TreeModel::Ptr _tree;
+    TreeModel* _tree;
 
     Objgroup _objgroups, _objects, _notifs;
     ErrorInfo _errinf;
@@ -177,17 +179,16 @@ public:
 
     using Ptr = std::shared_ptr<Parser>;
 
-    Parser(TreeModel::Ptr tree = nullptr);
+    Parser(TreeModel* tree = nullptr);
 
     void parse(std::ifstream& file);
+    void parseToken(std::ifstream& file, Token& token);
     const ErrorInfo& lastErrorInfo();
 
-public:
+private:
 
 #define EmptyResult NodeList();
 
-
-    void parseToken(std::ifstream& file, Token& token);
     void parseQuoteString(std::ifstream& file, Token& token);
     bool isLabelChar(char ch);
     void parseImports(std::ifstream& file);

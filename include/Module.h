@@ -1,6 +1,28 @@
 #pragma once
 #include <Node.h>
 
+struct ModuleInfo
+{
+    using Ptr = std::shared_ptr<ModuleInfo>;
+
+	ModuleInfo(const std::string& ModuleName = "", 
+        std::string ModulePath = "", 
+        bool NeedToLoad = false,
+        const Strs& ModuleImprots = {});
+	ModuleInfo(const ModuleInfo& other);
+	ModuleInfo(ModuleInfo&& other) noexcept;
+
+    ModuleInfo& operator=(const ModuleInfo& other);
+    ModuleInfo& operator=(ModuleInfo&& other) noexcept;
+
+	std::string moduleName;
+	std::string modulePath;
+    Strs        moduleImports;
+	bool needToLoad = false;
+};
+
+using ModuleInfoTable = std::unordered_map<std::string, ModuleInfo::Ptr>;
+
 struct ModuleImport
 {
     ModuleImport();
@@ -21,8 +43,8 @@ struct Module
     using Ptr = std::shared_ptr<Module>;
     using Imports = std::vector<ModuleImport>;
 
-    Module();
-    Module(const std::string& ModuleName, const std::string& FileName);
+    Module(const std::string& ModuleName = "", const std::string& FileName = "");
+    ~Module();
 
     Module(const Module& other);
     Module(Module&& other) noexcept;
@@ -41,13 +63,15 @@ public:
 
     using Ptr = std::shared_ptr<ModuleTable>;
 
-    ModuleTable(const std::string& folderPath);
+	ModuleTable(const Strs& ModulesPaths = {});
 
     Module::Ptr findModule(const std::string& Name) const;
     Node::Ptr findNode(const std::string& Name, const std::string& Module = std::string()) const;
 
     void addModule(const Module::Ptr& Module);
-    bool deleteModule(const std::string& Name);
+    bool removeModule(const std::string& Name);
+
+	void updateModuleInfo(const ModuleInfo::Ptr& ModuleInfo);
 
 private:
 

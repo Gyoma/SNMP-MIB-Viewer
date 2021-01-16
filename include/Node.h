@@ -9,7 +9,8 @@ struct Node
     using WPtr = std::weak_ptr<Node>;
 
     Node();
-    Node(const std::string Name, uint32_t SubID);
+    Node(const std::string Name, uint32_t SubID, 
+        const std::string& ParentName = "", const Strs& Modules = {});
 
 
     std::string					label;  /* This node's (unique) textual name */

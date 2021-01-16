@@ -1,53 +1,35 @@
 #include <TreeModel.h>
+#include <Parser.h>
+#include <fstream>
 
 TreeModel::TreeModel(const ModuleTable::Ptr& moduleTable) :
     _moduleTable(moduleTable),
-    _header(Node::Ptr(new Node("MIB Tree", 0)))
+    _header(new Node("MIB Tree", 0)),
+    _parser(new Parser(this))
 {
     _header->children = {
-        Node::Ptr(new Node("ccitt", 0)),
-        Node::Ptr(new Node("iso", 1)),
-        Node::Ptr(new Node("joint-iso-ccitt", 2))
+        Node::Ptr(new Node("ccitt", 0, "", { ROOTS_MODULE_NAME })),
+        Node::Ptr(new Node("iso", 1, "", { ROOTS_MODULE_NAME })),
+        Node::Ptr(new Node("joint-iso-ccitt", 2, "", { ROOTS_MODULE_NAME }))
     };
 
-    Module::Ptr mibRootsModule(new Module);
+    Module::Ptr mibRootsModule(new Module(ROOTS_MODULE_NAME));
 
     for (auto const& node : _header->children)
         mibRootsModule->nodes[node->label] = node;
 
-    _moduleTable->addModule(mibRootsModule);
+    if (_moduleTable)
+        _moduleTable->addModule(mibRootsModule);
 }
 
 Node::Ptr TreeModel::findNode(const std::string& name, const std::string& module) const
 {
-    //return Node::Ptr(new Node());
-
-    return _moduleTable->findNode(name, module);
-
-    //auto res = _nodeTable.find(name);
-    //
-    //if (res != _nodeTable.end())
-    //{
-    //	if (module.empty())
-    //		return res->second;
-    //	else
-    //	{
-    //		auto const& node = res->second;
-    //		auto const& modules = node->modules;
-    //		size_t size = modules.size();
-    //
-    //		for (size_t i = 0; i < size; ++i)
-    //			if (modules[i] == module)
-    //				return node;
-    //	}
-    //}
-    //
-    //return nullptr;
+    return _moduleTable ? _moduleTable->findNode(name, module) : nullptr;
 }
 
 Module::Ptr TreeModel::findModule(const std::string& name) const
 {
-    return _moduleTable->findModule(name);
+    return _moduleTable ? _moduleTable->findModule(name) : nullptr;
 }
 
 // links up nodes to the tree
@@ -57,31 +39,39 @@ void TreeModel::linkupNodes(NodeList& nodes)
     //in the process of parsing nodes, they will be ordered and one could use this, 
     //but this approach is generic
 
-    bool success = true;
-
-    while (success)
+    if (_moduleTable)
     {
-        success = false;
+        bool success = true;
 
-        for (auto nodeit = nodes.begin(); nodeit != nodes.end(); )
+        while (success)
         {
-            auto const& np = *nodeit;
+            success = false;
 
-            //check that the node is not connected yet
-
-            auto tnp = findNode(np->label);
-
-            if (tnp == nullptr || tnp->parent.expired())
+            for (auto nodeit = nodes.begin(); nodeit != nodes.end(); )
             {
-                auto parent = findNode(np->parentName);
+                auto const& np = *nodeit;
 
-                if (parent)
+                //check that the node is not connected yet
+                auto tnp = findNode(np->label, np->modules.front());
+
+                if (tnp == nullptr)
                 {
-                    np->parent = parent;
-                    parent->children.push_back(np);
+                    auto parent = findNode(np->parentName);
 
-                    if (tnp == nullptr)
+                    if (parent)
                     {
+                        np->parent = parent;
+                        auto& pchildren = parent->children;
+
+                        //находим место для вставки
+                        auto lower = std::lower_bound(pchildren.begin(), pchildren.end(), np,
+                            [](const Node::Ptr& npl, const Node::Ptr& npr)
+                            {
+                                return npl->subid < npr->subid;
+                            });
+
+                        pchildren.insert(lower, np);
+
                         for (auto& moduleName : np->modules)
                         {
                             auto mp = findModule(moduleName);
@@ -92,30 +82,30 @@ void TreeModel::linkupNodes(NodeList& nodes)
                                 mp->isLinked = true;
                             }
                         }
-                    }
 
-                    nodeit = nodes.erase(nodeit);
-                    success = true;
+                        nodeit = nodes.erase(nodeit);
+                        success = true;
+                    }
+                    else
+                        ++nodeit;
                 }
                 else
-                    ++nodeit;
-            }
-            else
-            {
-                auto& existingModules = tnp->modules;
-                auto const& moduleName = np->modules.front();
-                size_t size = existingModules.size(), i = 0;
-
-                for (; i < size; ++i)
                 {
-                    if (existingModules[i] == moduleName)
-                        break;
+                    auto& existingModules = tnp->modules;
+                    auto const& moduleName = np->modules.front();
+                    size_t size = existingModules.size(), i = 0;
+
+                    for (; i < size; ++i)
+                    {
+                        if (existingModules[i] == moduleName)
+                            break;
+                    }
+
+                    if (i == size)
+                        existingModules.push_back(moduleName);
+
+                    nodeit = nodes.erase(nodeit);
                 }
-
-                if (i == size)
-                    existingModules.push_back(moduleName);
-
-                nodeit = nodes.erase(nodeit);
             }
         }
     }
@@ -160,6 +150,7 @@ void TreeModel::unlinkModule(const std::string& moduleName)
         }
 
         mp->isLinked = false;
+        emit layoutChanged();
     }
 }
 
@@ -167,8 +158,15 @@ void TreeModel::linkupModule(const std::string& moduleName)
 {
     auto mp = findModule(moduleName);
 
-    if (mp)
+    if (mp && !mp->isLinked)
     {
+        if (!mp->isParsed)
+        {
+            loadModule(mp->moduleName);
+            emit layoutChanged();
+            return;
+        }
+
         for (auto const& nodep : mp->nodes)
         {
             auto const& np = nodep.second;
@@ -180,7 +178,16 @@ void TreeModel::linkupModule(const std::string& moduleName)
                 if (parent)
                 {
                     np->parent = parent;
-                    parent->children.push_back(np);
+                    auto& pchildren = parent->children;
+
+                    //находим место для вставки
+                    auto lower = std::lower_bound(pchildren.begin(), pchildren.end(), np,
+                        [](const Node::Ptr& npl, const Node::Ptr& npr)
+                        {
+                            return npl->subid < npr->subid;
+                        });
+
+                    pchildren.insert(lower, np);
 
                     for (auto const& module : parent->modules)
                     {
@@ -191,16 +198,70 @@ void TreeModel::linkupModule(const std::string& moduleName)
                             if (!parentmp->isLinked)
                                 linkupModule(module);
 
-                            if (parentmp->isLinked)
-                            {
-                                mp->isLinked = true;
-                                //break;
-                            }
+                            mp->isLinked = true;
                         }
                     }
                 }
             }
         }
+        emit layoutChanged();
+    }
+}
+
+void TreeModel::removeModule(const std::string& name)
+{
+    auto mp = findModule(name);
+
+    if (mp)
+    {
+        for (auto const& nodep : mp->nodes)
+        {
+            auto const& np = nodep.second;
+
+            auto parent = np->parent.lock();
+
+            if (parent)
+            {
+                auto& children = parent->children;
+
+                for (auto childit = children.begin(); childit != children.end(); ++childit)
+                {
+                    if (*childit == np)
+                    {
+                        children.erase(childit);
+                        break;
+                    }
+                }
+            }
+        }
+
+        _moduleTable->removeModule(mp->moduleName);
+        emit layoutChanged();
+    }
+}
+
+void TreeModel::loadModule(const std::string& name)
+{
+
+    auto mp = findModule(name);
+
+    if (mp)
+    {
+        std::ifstream file(mp->fileName);
+
+        if (!file.is_open())
+            return;
+
+        _parser->parse(file);
+        emit layoutChanged();
+    }
+}
+
+void TreeModel::updateModuleInfo(const ModuleInfo::Ptr& ModuleInfo)
+{
+    if (_moduleTable)
+    {
+        _moduleTable->updateModuleInfo(ModuleInfo);
     }
 }
 
@@ -209,16 +270,16 @@ QVariant TreeModel::data(const QModelIndex& index, int role) const
     if (!index.isValid())
         return QVariant();
 
-    const Node::Ptr& node = getNode(index);
+    Node* node = getNode(index);
 
     switch (role)
     {
     case Qt::DisplayRole:
         return QString::fromStdString(node->label);
-    //case Qt::DecorationRole:
-    //    if (index.column() == 0)
-    //        return item->getIcon();
-    //    break;
+        //case Qt::DecorationRole:
+        //    if (index.column() == 0)
+        //        return item->getIcon();
+        //    break;
     }
 
     return QVariant();
@@ -231,7 +292,7 @@ QVariant TreeModel::headerData(int section, Qt::Orientation orientation, int rol
         //switch (section)
         //{
         //case 0:
-        return QString::fromStdString(_header->label);
+        return QString::fromUtf8(u8"MIB Дерево");
         //case 1:
         //    return _header->inf();
         //}
@@ -246,7 +307,7 @@ QModelIndex TreeModel::index(int row, int column, const QModelIndex& parent) con
         return QModelIndex();
 
     //TreeItem* parentItem;
-    const Node::Ptr& parentNode = parent.isValid() ? getNode(parent) : _header;
+    Node* parentNode = parent.isValid() ? getNode(parent) : _header.get();
 
 
 
@@ -257,10 +318,10 @@ QModelIndex TreeModel::index(int row, int column, const QModelIndex& parent) con
     //    parentNode = getNode(parent);
         //parentItem = getItem(parent);
 
-    Node::Ptr& childNode = parentNode->children[row];
+    Node* childNode = parentNode->children[row].get();
     //TreeItem* childItem = parentItem->child(row);
     if (childNode)
-        return createIndex(row, column, &childNode);
+        return createIndex(row, column, childNode);
 
     return QModelIndex();
 }
@@ -270,18 +331,18 @@ QModelIndex TreeModel::parent(const QModelIndex& index) const
     if (!index.isValid())
         return QModelIndex();
 
-    const Node::Ptr& childNode = getNode(index);
-    Node::Ptr& parentNode = childNode ? childNode->parent.lock() : nullptr;
+    Node* childNode = getNode(index);
+    Node* parentNode = childNode ? childNode->parent.lock().get() : nullptr;
 
-    if (parentNode == _header || !parentNode)
+    if (parentNode == _header.get() || !parentNode)
         return QModelIndex();
 
-    return createIndex(parentNode->children.size(), 0, &parentNode);
+    return createIndex(parentNode->children.size(), 0, parentNode);
 }
 
 int TreeModel::rowCount(const QModelIndex& parent) const
 {
-    const Node::Ptr& parentNode = getNode(parent);
+    Node* parentNode = getNode(parent);
     return parentNode ? parentNode->children.size() : 0;
 }
 
@@ -291,11 +352,11 @@ int TreeModel::columnCount(const QModelIndex& parent) const
     return 1;
 }
 
-Node::Ptr TreeModel::getNode(QModelIndex const& index) const
+Node* TreeModel::getNode(const QModelIndex& index) const
 {
     if (index.isValid())
     {
-        return *static_cast<Node::Ptr*>(index.internalPointer());
+        return static_cast<Node*>(index.internalPointer());
 
 
         //Node::Ptr* node = static_cast<Node::Ptr*>(index.internalPointer());
@@ -303,13 +364,13 @@ Node::Ptr TreeModel::getNode(QModelIndex const& index) const
         //if (node)
         //    return *node;
     }
-    return _header;
+    return _header.get();
 }
 
-QModelIndex TreeModel::getIndex(Node::Ptr& node)
+QModelIndex TreeModel::getIndex(const Node::Ptr& node)
 {
     if (!node || node == _header)
         return QModelIndex();
 
-    return createIndex(node->children.size(), 0, &node);
+    return createIndex(node->children.size(), 0, node.get());
 }

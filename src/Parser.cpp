@@ -1,9 +1,10 @@
 #include <Parser.h>
+#include <TreeModel.h>
 #include <fstream>
 
 
-Parser::Parser(TreeModel::Ptr tree) :
-    _tree(tree),
+Parser::Parser(TreeModel* Tree) :
+    _tree(Tree),
     _line(0)
 {}
 
@@ -2640,7 +2641,7 @@ NodeList Parser::parseObjectid(std::ifstream& file, const std::string& objName)
         auto& oid = oids[0];
 
         //the module for the MIB roots has an empty name
-        auto mibRootsModule = _tree->findModule("");
+        auto mibRootsModule = _tree->findModule(ROOTS_MODULE_NAME);
         auto const& roots = mibRootsModule->nodes;
 
         for (auto const& root : roots)
@@ -4036,7 +4037,7 @@ void Parser::parse(std::ifstream& file)
                 if (_errinf.isError)
                     return;
 
-                _tree->linkupNodes(result);
+				_tree->linkupNodes(result);
 
                 if (!result.empty())
                 {
@@ -4112,12 +4113,6 @@ void Parser::parse(std::ifstream& file)
                 _errinf.isError = true;
                 _errinf.description = formError("Error, nested MIBS", token.lexem);
                 return;
-                //result.clear();
-                //return result;
-                //print_error("Error, nested MIBS", NULL, type);
-                //gMibError = MODULE_SYNTAX_ERROR;
-                //goto error;
-                //return NULL;
             }
             state = IN_MIB;
 

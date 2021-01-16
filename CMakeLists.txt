@@ -5,12 +5,6 @@ set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 set(PROJECT_NAME netsnmp-parser)
 project(${PROJECT_NAME})
 
-if(MSVC)
-	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /std:c++17")
-else()
-	set(CMAKE_CXX_STAANDARD 17)
-endif(MSVC)
-
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
@@ -18,10 +12,11 @@ set(CMAKE_INLCUDE_CURRENT_DIR ON)
 
 set(CMAKE_PREFIX_PATH "$ENV{QtPath}")
 
-find_package(Qt5 COMPONENTS Core Gui Widgets Charts REQUIRED)
+find_package(Qt5 COMPONENTS Core Gui Widgets REQUIRED)
 
 set(PROJECT_UI
-	src/ui/MIBBrowser.ui
+	src/ui/MIBBrowserWindow.ui
+	src/ui/MIBManagmentDialog.ui
 )
 
 set(PROJECT_FILES
@@ -31,14 +26,16 @@ set(PROJECT_FILES
 	include/Parser.h
 	include/TCList.h
 	include/TreeModel.h
-	include/MIBBrowser.h
+	include/MIBBrowserWindow.h
+	include/MIBManagmentDialog.h
 	src/main.cpp
 	src/Module.cpp
 	src/Node.cpp
 	src/Parser.cpp
 	src/TCList.cpp
 	src/TreeModel.cpp
-	src/MIBBrowser.cpp
+	src/MIBBrowserWindow.cpp
+	src/MIBManagmentDialog.cpp
 )
 
 add_executable(
