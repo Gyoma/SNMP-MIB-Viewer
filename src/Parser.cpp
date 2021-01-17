@@ -3,6 +3,136 @@
 #include <fstream>
 
 
+const LexemTypeTable Parser::_lexemTable = {
+        { "obsolete",				LT::eOBSOLETE},
+        { "Opaque",					LT::eOPAQUE},
+        { "optional" ,				LT::eOPTIONAL},
+        { "LAST-UPDATED",			LT::eLASTUPDATED },
+        { "ORGANIZATION",			LT::eORGANIZATION},
+        { "CONTACT-INFO",			LT::eCONTACTINFO},
+        { "MODULE-IDENTITY",		LT::eMODULEIDENTITY},
+        { "MODULE-COMPLIANCE",		LT::eCOMPLIANCE },
+        { "DEFINITIONS",			LT::eDEFINITIONS},
+        { "END",					LT::eEND},
+        { "AUGMENTS",				LT::eAUGMENTS},
+        { "not-accessible",			LT::eNOACCESS},
+        { "write-only",				LT::eWRITEONLY},
+        { "NsapAddress",			LT::eNSAPADDRESS},
+        { "UNITS",					LT::eUNITS},
+        { "REFERENCE",				LT::eREFERENCE},
+        { "NUM-ENTRIES" ,			LT::eNUMENTRIES},
+        { "BITSTRING",				LT::eBITSTRING},
+        { "BIT",					LT::eCONTINUE},
+        { "BITS",					LT::eBITSTRING},
+        { "Counter64",				LT::eCOUNTER64},
+        { "TimeTicks",				LT::eTIMETICKS},
+        { "NOTIFICATION-TYPE",		LT::eNOTIFTYPE},
+        { "OBJECT-GROUP" ,			LT::eOBJGROUP},
+        { "OBJECT-IDENTITY",		LT::eOBJIDENTITY },
+        { "IDENTIFIER",				LT::eIDENTIFIER},
+        { "OBJECT",					LT::eOBJECT},
+        { "NetworkAddress",			LT::eNETADDR},
+        { "Gauge",					LT::eGAUGE},
+        { "Gauge32",				LT::eGAUGE},
+        { "Unsigned32",				LT::eUNSIGNED32},
+        { "read-write",				LT::eREADWRITE},
+        { "read-create",			LT::eREADCREATE},
+        { "OCTETSTRING",			LT::eOCTETSTR},
+        { "OCTET",					LT::eCONTINUE},
+        { "OF",						LT::eOF},
+        { "SEQUENCE",				LT::eSEQUENCE},
+        { "NULL",					LT::eNULL},
+        { "IpAddress",				LT::eIPADDR},
+        { "UInteger32",				LT::eUINTEGER32},
+        { "INTEGER",				LT::eINTEGER},
+        { "Integer32",				LT::eINTEGER32},
+        { "Counter",				LT::eCOUNTER},
+        { "Counter32",				LT::eCOUNTER},
+        { "read-only",				LT::eREADONLY },
+        { "DESCRIPTION",			LT::eDESCRIPTION},
+        { "INDEX",					LT::eINDEX},
+        { "DEFVAL",					LT::eDEFVAL},
+        { "deprecated",				LT::eDEPRECATED},
+        { "SIZE",					LT::eSIZE},
+        { "MAX-ACCESS",				LT::eACCESS },
+        { "ACCESS",					LT::eACCESS},
+        { "mandatory",				LT::eMANDATORY},
+        { "current",				LT::eCURRENT},
+        { "STATUS",					LT::eSTATUS},
+        { "SYNTAX",					LT::eSYNTAX},
+        { "OBJECT-TYPE",			LT::eOBJTYPE},
+        { "TRAP-TYPE",				LT::eTRAPTYPE },
+        { "ENTERPRISE",				LT::eENTERPRISE},
+        { "BEGIN",					LT::eBEGIN},
+        { "IMPORTS",				LT::eIMPORTS},
+        { "EXPORTS",				LT::eEXPORTS},
+        { "accessible-for-notify",	LT::eACCNOTIFY},
+        { "TEXTUAL-CONVENTION",		LT::eCONVENTION},
+        { "NOTIFICATION-GROUP",		LT::eNOTIFGROUP },
+        { "DISPLAY-HINT",			LT::eDISPLAYHINT },
+        { "FROM",					LT::eFROM},
+        { "AGENT-CAPABILITIES",		LT::eAGENTCAP },
+        { "MACRO",					LT::eMACRO },
+        { "IMPLIED",				LT::eIMPLIED },
+        { "SUPPORTS",				LT::eSUPPORTS },
+        { "INCLUDES",				LT::eINCLUDES },
+        { "VARIATION",				LT::eVARIATION },
+        { "REVISION",				LT::eREVISION },
+        { "not-implemented",		LT::eNOTIMPL },
+        { "OBJECTS",				LT::eOBJECT },
+        { "NOTIFICATIONS",			LT::eNOTIFICATIONS },
+        { "MODULE",					LT::eMODULE },
+        { "MIN-ACCESS",				LT::eMINACCESS },
+        { "PRODUCT-RELEASE",		LT::ePRODREL },
+        { "WRITE-SYNTAX",			LT::eWRSYNTAX },
+        { "CREATION-REQUIRES",		LT::eCREATEREQ },
+        { "MANDATORY-GROUPS",		LT::eMANDATORYGROUPS },
+        { "GROUP",					LT::eGROUP },
+        { "CHOICE",					LT::eCHOICE },
+        { "IMPLICIT",				LT::eIMPLICIT },
+        { "ObjectSyntax",			LT::eOBJSYNTAX },
+        { "SimpleSyntax",			LT::eSIMPLESYNTAX },
+        { "ApplicationSyntax",		LT::eAPPSYNTAX },
+        { "ObjectName",				LT::eOBJNAME },
+        { "NotificationName",		LT::eNOTIFNAME },
+        { "VARIABLES",				LT::eVARIABLES }
+};
+
+const std::vector<Parser::ModuleCompatibility> Parser::_modCompats = {
+
+        { "RFC1065-SMI", "RFC1155-SMI", "", false },
+        { "RFC1066-MIB", "RFC1156-MIB", "", false },
+        /*
+         * 'mib' -> 'mib-2'
+         */
+        { "RFC1156-MIB", "RFC1158-MIB", "", false },
+        /*
+         * 'snmpEnableAuthTraps' -> 'snmpEnableAuthenTraps'
+         */
+        { "RFC1158-MIB", "RFC1213-MIB", "", false },
+        /*
+         * 'nullOID' -> 'zeroDotZero'
+         */
+        { "RFC1155-SMI", "SNMPv2-SMI", "", false},
+        { "RFC1213-MIB", "SNMPv2-SMI", "mib-2", false},
+        { "RFC1213-MIB", "SNMPv2-MIB", "sys", true },
+        { "RFC1213-MIB", "IF-MIB", "if", true },
+        { "RFC1213-MIB", "IP-MIB", "ip", true },
+        { "RFC1213-MIB", "IP-MIB", "icmp", true },
+        { "RFC1213-MIB", "TCP-MIB", "tcp", true },
+        { "RFC1213-MIB", "UDP-MIB", "udp", true },
+        { "RFC1213-MIB", "SNMPv2-SMI", "transmission", false },
+        { "RFC1213-MIB", "SNMPv2-MIB", "snmp", true },
+        { "RFC1231-MIB", "TOKENRING-MIB", "", false },
+        { "RFC1271-MIB", "RMON-MIB", "", false },
+        { "RFC1286-MIB", "SOURCE-ROUTING-MIB", "dot1dSr", true },
+        { "RFC1286-MIB", "BRIDGE-MIB", "", false },
+        { "RFC1315-MIB", "FRAME-RELAY-DTE-MIB", "", false },
+        { "RFC1316-MIB", "CHARACTER-MIB", "", false },
+        { "RFC1406-MIB", "DS1-MIB", "", false },
+        { "RFC-1213", "RFC1213-MIB", "", false }
+};
+
 Parser::Parser(TreeModel* Tree) :
     _tree(Tree),
     _line(0)
@@ -2641,7 +2771,7 @@ NodeList Parser::parseObjectid(std::ifstream& file, const std::string& objName)
         auto& oid = oids[0];
 
         //the module for the MIB roots has an empty name
-        auto mibRootsModule = _tree->findModule(ROOTS_MODULE_NAME);
+        auto mibRootsModule = _tree->findModule("");
         auto const& roots = mibRootsModule->nodes;
 
         for (auto const& root : roots)
@@ -3892,9 +4022,9 @@ void Parser::parseToken(std::ifstream& file, Token& token)
 
                 file.unget();
 
-                auto it = _lexemTypes.find(token.lexem);
+                auto it = _lexemTable.find(token.lexem);
 
-                if (it != _lexemTypes.end())
+                if (it != _lexemTable.end())
                 {
                     token.type = it->second;
 
@@ -3938,6 +4068,18 @@ void Parser::parseToken(std::ifstream& file, Token& token)
             token.type = LT::eLABEL;
         }
     }
+}
+
+std::string Parser::typeToStr(LT type)
+{
+    for (auto const& lexemPair : _lexemTable)
+        if (lexemPair.second == type)
+            return lexemPair.first;
+
+    if (type == LT::eOBJID)
+        return "OBJECT IDENTIFIER";
+
+    return "";
 }
 
 void Parser::parseQuoteString(std::ifstream& file, Token& token)

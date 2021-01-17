@@ -62,19 +62,19 @@ QString MIBManagmentDialog::getFolderPath()
     return _lastFolderPath;
 }
 
-MIBManagmentDialog::EventList MIBManagmentDialog::getEventList()
+MIBManagmentDialog::MIBEventList MIBManagmentDialog::getMIBEventList()
 {
     return _eventList;
 }
 
 Q_SLOT void MIBManagmentDialog::selectFolder()
 {
-    QFileDialog fileDialog(this, QString::fromUtf8(u8"Выбор папки"));
+    QFileDialog fileDialog(this, QString::fromUtf8("Выбор папки"));
     fileDialog.setDirectory(_lastFolderPath.isEmpty() ? QDir::currentPath() : _lastFolderPath);
     fileDialog.setFileMode(QFileDialog::DirectoryOnly);
     fileDialog.setOptions(QFileDialog::ShowDirsOnly | QFileDialog::DontResolveSymlinks);
-    fileDialog.setLabelText(QFileDialog::DialogLabel::Accept, QString::fromUtf8(u8"Выбрать"));
-    fileDialog.setLabelText(QFileDialog::DialogLabel::Reject, QString::fromUtf8(u8"Отмена"));
+    fileDialog.setLabelText(QFileDialog::DialogLabel::Accept, QString::fromUtf8("Выбрать"));
+    fileDialog.setLabelText(QFileDialog::DialogLabel::Reject, QString::fromUtf8("Отмена"));
 
     if (fileDialog.exec())
     {
@@ -83,13 +83,13 @@ Q_SLOT void MIBManagmentDialog::selectFolder()
         if (_lastFolderPath == newOpenedFolder)
         {
             QMessageBox messageBox(QMessageBox::Question,
-                QString::fromUtf8(u8"Повторный выбор папки"),
-                QString::fromUtf8(u8"Данная папка уже была ранее загружена. Вы хотите перезагрузить ее ?"),
+                QString::fromUtf8("Повторный выбор папки"),
+                QString::fromUtf8("Данная папка уже была ранее загружена. Вы хотите перезагрузить ее ?"),
                 QMessageBox::Yes | QMessageBox::No,
                 this);
 
-            messageBox.setButtonText(QMessageBox::Yes, QString::fromUtf8(u8"Да"));
-            messageBox.setButtonText(QMessageBox::No, QString::fromUtf8(u8"Нет"));
+            messageBox.setButtonText(QMessageBox::Yes, QString::fromUtf8("Да"));
+            messageBox.setButtonText(QMessageBox::No, QString::fromUtf8("Нет"));
 
             auto reply = messageBox.exec();
 
@@ -109,7 +109,7 @@ Q_SLOT void MIBManagmentDialog::selectFolder()
         _ui->unloadModuleButton->setEnabled(false);
         _modulesInfoTable.clear();
         //_eventList.push_back()
-        //_changeType = EventType::Refresh;
+        //_changeType = MIBEventType::Refresh;
 
         Parser parser;
         Token token;
@@ -158,7 +158,7 @@ Q_SLOT void MIBManagmentDialog::selectFolder()
         // Резервируем место для данных обновления, а не перемещаем таблицу,
         // чтобы не иметь две копии одной таблицы.
         // В конце работы переместим туда таблицу.
-        updateOrMoveToHistory(EventType::Refresh, {});
+        updateOrMoveToHistory(MIBEventType::Refresh, {});
     }
 }
 
@@ -196,16 +196,16 @@ Q_SLOT void MIBManagmentDialog::doneСonfigure()
         auto& firstEvent = _eventList.front();
 
         // Если место зарезервировано для обновления
-        if (firstEvent.type == EventType::Refresh)
+        if (firstEvent.type == MIBEventType::Refresh)
             firstEvent.table = std::move(_modulesInfoTable);
     }
 
     this->accept();
 }
 
-void MIBManagmentDialog::updateOrMoveToHistory(EventType Type, ModuleInfoTable&& Data)
+void MIBManagmentDialog::updateOrMoveToHistory(MIBEventType Type, ModuleInfoTable&& Data)
 {
-    if (Type == EventType::Refresh)
+    if (Type == MIBEventType::Refresh)
     {
         _eventList.clear();
     }
@@ -214,11 +214,11 @@ void MIBManagmentDialog::updateOrMoveToHistory(EventType Type, ModuleInfoTable&&
         auto const& moduleName = Data.begin()->first;
 
         for (auto it = _eventList.begin(); it != _eventList.end(); ++it)
-            if (it->type != EventType::Refresh && it->table.begin()->first == moduleName)
+            if (it->type != MIBEventType::Refresh && it->table.begin()->first == moduleName)
             {
                 // Если противоположные операции, то делать ничего не нужно
-                if ((it->type == EventType::Load && Type == EventType::Unload) || 
-                    (it->type == EventType::Unload && Type == EventType::Load))
+                if ((it->type == MIBEventType::Load && Type == MIBEventType::Unload) || 
+                    (it->type == MIBEventType::Unload && Type == MIBEventType::Load))
                     _eventList.erase(it);
 
                 return;
@@ -238,7 +238,7 @@ void MIBManagmentDialog::addAllModules(const std::string& RootModuleName)
     {
 
         // Добавляем в историю модуль, который нужно загрузить
-        updateOrMoveToHistory(EventType::Load, ModuleInfoTable{ { RootModuleName, nullptr } });
+        updateOrMoveToHistory(MIBEventType::Load, ModuleInfoTable{ { RootModuleName, nullptr } });
 
         // Отображаем модуль в списке загруженных
         _ui->loadedModulesList->addItem(ModuleName);
@@ -305,9 +305,9 @@ void MIBManagmentDialog::removeAllModules(const std::string & RootModuleName)
 
     if (!modules.empty())
     {
-        QString message = QString::fromUtf8(u8"Кроме ") +
+        QString message = QString::fromUtf8("Кроме ") +
             QString::fromStdString(RootModuleName) +
-            QString::fromUtf8(u8" будут также удалены:\n\n");
+            QString::fromUtf8(" будут также удалены:\n\n");
 
         //for(auto const& childModule: modules)
         //    message += QString::fromStdString(childModule) + "\n";
@@ -315,16 +315,16 @@ void MIBManagmentDialog::removeAllModules(const std::string & RootModuleName)
             message += QString::fromStdString(modules[i]) + ", ";
         message += QString::fromStdString(modules.back());
 
-        message += QString::fromUtf8(u8"\n\nХотите удалить ?");
+        message += QString::fromUtf8("\n\nХотите удалить ?");
 
         QMessageBox messageBox(QMessageBox::Question,
-            QString::fromUtf8(u8"Множественное удаление"),
+            QString::fromUtf8("Множественное удаление"),
             message,
             QMessageBox::Yes | QMessageBox::No,
             this);
 
-        messageBox.setButtonText(QMessageBox::Yes, QString::fromUtf8(u8"Да"));
-        messageBox.setButtonText(QMessageBox::No, QString::fromUtf8(u8"Нет"));
+        messageBox.setButtonText(QMessageBox::Yes, QString::fromUtf8("Да"));
+        messageBox.setButtonText(QMessageBox::No, QString::fromUtf8("Нет"));
 
         auto reply = messageBox.exec();
 
@@ -336,7 +336,7 @@ void MIBManagmentDialog::removeAllModules(const std::string & RootModuleName)
 
     for (auto const& moduleToRemove : modules)
     {
-        updateOrMoveToHistory(EventType::Unload, ModuleInfoTable{ {moduleToRemove, nullptr} });
+        updateOrMoveToHistory(MIBEventType::Unload, ModuleInfoTable{ {moduleToRemove, nullptr} });
 
         QString ModuleName = QString::fromStdString(moduleToRemove);
         _ui->availableModulesList->addItem(ModuleName);
@@ -344,28 +344,28 @@ void MIBManagmentDialog::removeAllModules(const std::string & RootModuleName)
     }
 }
 
-MIBManagmentDialog::Event::Event(EventType Type, const ModuleInfoTable & Table) :
+MIBManagmentDialog::MIBEvent::MIBEvent(MIBEventType Type, const ModuleInfoTable & Table) :
     type(Type),
     table(Table)
 {}
 
-MIBManagmentDialog::Event::Event(EventType Type, ModuleInfoTable && Table) :
+MIBManagmentDialog::MIBEvent::MIBEvent(MIBEventType Type, ModuleInfoTable && Table) :
     type(Type),
     table(std::move(Table))
 {}
 
-MIBManagmentDialog::Event::Event(const Event & other) :
-    Event(other.type, other.table)
+MIBManagmentDialog::MIBEvent::MIBEvent(const MIBEvent & other) :
+    MIBEvent(other.type, other.table)
 {}
 
-MIBManagmentDialog::Event::Event(Event && other) noexcept :
+MIBManagmentDialog::MIBEvent::MIBEvent(MIBEvent && other) noexcept :
     type(other.type),
     table(std::move(other.table))
 {
-    other.type = EventType::None;
+    other.type = MIBEventType::None;
 }
 
-MIBManagmentDialog::Event & MIBManagmentDialog::Event::operator=(const Event & other)
+MIBManagmentDialog::MIBEvent & MIBManagmentDialog::MIBEvent::operator=(const MIBEvent & other)
 {
     if (this != &other)
     {
@@ -376,13 +376,13 @@ MIBManagmentDialog::Event & MIBManagmentDialog::Event::operator=(const Event & o
     return *this;
 }
 
-MIBManagmentDialog::Event & MIBManagmentDialog::Event::operator=(Event && other) noexcept
+MIBManagmentDialog::MIBEvent & MIBManagmentDialog::MIBEvent::operator=(MIBEvent && other) noexcept
 {
     if (this != &other)
     {
         type = other.type;
         table = std::move(other.table);
-        other.type = EventType::None;
+        other.type = MIBEventType::None;
     }
 
     return *this;

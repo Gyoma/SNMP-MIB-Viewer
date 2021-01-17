@@ -11,7 +11,7 @@ class MIBManagmentDialog: public QDialog
 {
 public:
 
-    enum class EventType
+    enum class MIBEventType
     {
         Refresh,
         Load,
@@ -19,21 +19,21 @@ public:
         None
     };
 
-    struct Event
+    struct MIBEvent
     {
-        Event(EventType Type = EventType::None, const ModuleInfoTable& Table = {});
-        Event(EventType Type, ModuleInfoTable&& Table);
-        Event(const Event& other);
-        Event(Event&& other) noexcept;
+        MIBEvent(MIBEventType Type = MIBEventType::None, const ModuleInfoTable& Table = {});
+        MIBEvent(MIBEventType Type, ModuleInfoTable&& Table);
+        MIBEvent(const MIBEvent& other);
+        MIBEvent(MIBEvent&& other) noexcept;
 
-        Event& operator=(const Event& other);
-        Event& operator=(Event&& other) noexcept;
+        MIBEvent& operator=(const MIBEvent& other);
+        MIBEvent& operator=(MIBEvent&& other) noexcept;
 
-        EventType type;
+        MIBEventType type;
         ModuleInfoTable table;
     };
 
-    using EventList = std::vector<Event>;
+    using MIBEventList = std::vector<MIBEvent>;
 
     explicit MIBManagmentDialog(QWidget* parent = nullptr, 
         const QString& LastFolderPath = "", 
@@ -42,7 +42,7 @@ public:
 	~MIBManagmentDialog();
 
 	QString getFolderPath();
-    EventList getEventList();
+    MIBEventList getMIBEventList();
 
 	Q_SLOT void selectFolder();
 	Q_SLOT void loadModule();
@@ -52,7 +52,7 @@ public:
 
 private:
 
-    void updateOrMoveToHistory(EventType Type, ModuleInfoTable&& Data);
+    void updateOrMoveToHistory(MIBEventType Type, ModuleInfoTable&& Data);
     void addAllModules(const std::string& RootModuleName);
     Strs forWhichModulesIsRoot(const std::string& RootModuleName);
     void removeAllModules(const std::string& RootModuleName);
@@ -60,5 +60,5 @@ private:
 	Ui::MIBManagmentWindow* _ui;
 	QString                 _lastFolderPath;
     ModuleInfoTable         _modulesInfoTable;
-    EventList               _eventList;
+    MIBEventList               _eventList;
 };

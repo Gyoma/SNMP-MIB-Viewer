@@ -39,7 +39,7 @@ set(PROJECT_FILES
 )
 
 add_executable(
-	${PROJECT_NAME}
+	${PROJECT_NAME} WIN32
 	${PROJECT_UI}
 	${PROJECT_FILES}
 )

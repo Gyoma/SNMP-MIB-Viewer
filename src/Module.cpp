@@ -1,5 +1,4 @@
 #include <Parser.h>
-#include <filesystem>
 #include <fstream>
 
 
@@ -31,16 +30,14 @@ Node::Ptr ModuleTable::findNode(const std::string& Name, const std::string& Modu
         if (node != nodes.end())
             return node->second;
     }
-    else
-    {
-        for (auto const& module : _modules)
-        {
-            auto const& nodes = module.second->nodes;
-            auto node = nodes.find(Name);
 
-            if (node != nodes.end())
-                return node->second;
-        }
+    for (auto const& module : _modules)
+    {
+        auto const& nodes = module.second->nodes;
+        auto node = nodes.find(Name);
+
+        if (node != nodes.end())
+            return node->second;
     }
 
     return nullptr;

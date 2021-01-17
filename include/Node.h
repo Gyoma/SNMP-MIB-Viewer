@@ -15,6 +15,8 @@ struct Node
 
     std::string					label;  /* This node's (unique) textual name */
     uint32_t					subid;  /* This node's integer subidentifier */
+    std::string                 OID;
+    std::string                 labelOID;
     std::vector<Ptr>			children;
     Strs						modules;  /* The module containing this node */
     std::string					parentName; /* The parent's textual name */

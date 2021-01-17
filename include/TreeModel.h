@@ -37,7 +37,7 @@ public:
 
 private:
 
-#define ROOTS_MODULE_NAME "#roots#"
+//#define ROOTS_MODULE_NAME "#roots#"
 
     Node* getNode(const QModelIndex& index) const;
     QModelIndex getIndex(const Node::Ptr& node);

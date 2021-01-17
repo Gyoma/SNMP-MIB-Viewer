@@ -22,7 +22,8 @@ public:
 private:
 
     Q_SLOT void execMIBManagment();
-    Q_SLOT void showRelevantNodeInfo();
+    Q_SLOT void showRelevantNodeInfo(const class QItemSelection& selected);
+    Q_SLOT void shrinkViewToFit();
 
     void loadSavedData();
     void saveData();

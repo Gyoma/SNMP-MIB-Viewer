@@ -1,3 +1,4 @@
+#include <QMessageBox>
 #include <TreeModel.h>
 #include <Parser.h>
 #include <fstream>
@@ -7,16 +8,22 @@ TreeModel::TreeModel(const ModuleTable::Ptr& moduleTable) :
     _header(new Node("MIB Tree", 0)),
     _parser(new Parser(this))
 {
-    _header->children = {
-        Node::Ptr(new Node("ccitt", 0, "", { ROOTS_MODULE_NAME })),
-        Node::Ptr(new Node("iso", 1, "", { ROOTS_MODULE_NAME })),
-        Node::Ptr(new Node("joint-iso-ccitt", 2, "", { ROOTS_MODULE_NAME }))
-    };
+    Node::Ptr ccit(new Node("ccitt", 0));
+    ccit->OID = ".0";
+    ccit->labelOID = ccit->label;
+    Node::Ptr iso(new Node("iso", 1));
+    iso->OID = ".1";
+    iso->labelOID = iso->label;
+    Node::Ptr joint(new Node("joint-iso-ccitt", 2));
+    joint->OID = ".2";
+    joint->labelOID = joint->label;
 
-    Module::Ptr mibRootsModule(new Module(ROOTS_MODULE_NAME));
+    _header->children = { ccit, iso, joint };
 
-    for (auto const& node : _header->children)
-        mibRootsModule->nodes[node->label] = node;
+    Module::Ptr mibRootsModule(new Module);
+
+    for (auto const& root : _header->children)
+        mibRootsModule->nodes[root->label] = root;
 
     if (_moduleTable)
         _moduleTable->addModule(mibRootsModule);
@@ -61,6 +68,8 @@ void TreeModel::linkupNodes(NodeList& nodes)
                     if (parent)
                     {
                         np->parent = parent;
+                        np->OID += parent->OID + '.' + std::to_string(np->subid);
+                        np->labelOID += parent->labelOID + '.' + np->label;
                         auto& pchildren = parent->children;
 
                         //находим место для вставки
@@ -242,7 +251,6 @@ void TreeModel::removeModule(const std::string& name)
 
 void TreeModel::loadModule(const std::string& name)
 {
-
     auto mp = findModule(name);
 
     if (mp)
@@ -253,6 +261,14 @@ void TreeModel::loadModule(const std::string& name)
             return;
 
         _parser->parse(file);
+
+        auto const& errInfo = _parser->lastErrorInfo();
+
+        if (errInfo.isError)
+            QMessageBox::critical(nullptr,
+                QString::fromUtf8("Ошибка загрузка модуля"),
+                QString::fromStdString(errInfo.description));
+
         emit layoutChanged();
     }
 }
@@ -288,15 +304,7 @@ QVariant TreeModel::data(const QModelIndex& index, int role) const
 QVariant TreeModel::headerData(int section, Qt::Orientation orientation, int role) const
 {
     if (orientation == Qt::Horizontal && role == Qt::DisplayRole)
-    {
-        //switch (section)
-        //{
-        //case 0:
-        return QString::fromUtf8(u8"MIB Дерево");
-        //case 1:
-        //    return _header->inf();
-        //}
-    }
+        return QString::fromUtf8("MIB Дерево");
 
     return QVariant();
 }
@@ -306,20 +314,10 @@ QModelIndex TreeModel::index(int row, int column, const QModelIndex& parent) con
     if (!hasIndex(row, column, parent))
         return QModelIndex();
 
-    //TreeItem* parentItem;
     Node* parentNode = parent.isValid() ? getNode(parent) : _header.get();
 
-
-
-    //if (!parent.isValid())
-    //    parentNode = _header;
-    ////parentItem = _header;
-    //else
-    //    parentNode = getNode(parent);
-        //parentItem = getItem(parent);
-
     Node* childNode = parentNode->children[row].get();
-    //TreeItem* childItem = parentItem->child(row);
+
     if (childNode)
         return createIndex(row, column, childNode);
 
@@ -355,15 +353,8 @@ int TreeModel::columnCount(const QModelIndex& parent) const
 Node* TreeModel::getNode(const QModelIndex& index) const
 {
     if (index.isValid())
-    {
         return static_cast<Node*>(index.internalPointer());
 
-
-        //Node::Ptr* node = static_cast<Node::Ptr*>(index.internalPointer());
-        //
-        //if (node)
-        //    return *node;
-    }
     return _header.get();
 }
 
