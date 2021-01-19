@@ -22,7 +22,7 @@ public:
 private:
 
     Q_SLOT void execMIBManagment();
-    Q_SLOT void showRelevantNodeInfo(const class QItemSelection& selected);
+    Q_SLOT void showRelevantNodeInfo(const class QModelIndex& index);
     Q_SLOT void shrinkViewToFit();
 
     void loadSavedData();
@@ -30,6 +30,5 @@ private:
 
     Ui::MainMIBWindow*				_ui;
     TreeModel::Ptr					_treeModel;
-    QString                         _lastFolderPath;
-    ModuleInfoTable                 _modulesInfoTable;
+    ModuleMetaDataTable             _modulesInfoTable;
 };

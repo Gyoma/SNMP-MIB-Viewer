@@ -1,4 +1,5 @@
 #include <QMessageBox>
+#include <QIcon>
 #include <TreeModel.h>
 #include <Parser.h>
 #include <fstream>
@@ -75,9 +76,9 @@ void TreeModel::linkupNodes(NodeList& nodes)
                         //находим место для вставки
                         auto lower = std::lower_bound(pchildren.begin(), pchildren.end(), np,
                             [](const Node::Ptr& npl, const Node::Ptr& npr)
-                            {
-                                return npl->subid < npr->subid;
-                            });
+                        {
+                            return npl->subid < npr->subid;
+                        });
 
                         pchildren.insert(lower, np);
 
@@ -192,9 +193,9 @@ void TreeModel::linkupModule(const std::string& moduleName)
                     //находим место для вставки
                     auto lower = std::lower_bound(pchildren.begin(), pchildren.end(), np,
                         [](const Node::Ptr& npl, const Node::Ptr& npr)
-                        {
-                            return npl->subid < npr->subid;
-                        });
+                    {
+                        return npl->subid < npr->subid;
+                    });
 
                     pchildren.insert(lower, np);
 
@@ -273,12 +274,10 @@ void TreeModel::loadModule(const std::string& name)
     }
 }
 
-void TreeModel::updateModuleInfo(const ModuleInfo::Ptr& ModuleInfo)
+void TreeModel::addModuleInfo(const ModuleMetaData::Ptr & data)
 {
     if (_moduleTable)
-    {
-        _moduleTable->updateModuleInfo(ModuleInfo);
-    }
+        _moduleTable->addModule(Module::Ptr(new Module(data->moduleName, data->modulePath)));
 }
 
 QVariant TreeModel::data(const QModelIndex& index, int role) const
@@ -292,19 +291,7 @@ QVariant TreeModel::data(const QModelIndex& index, int role) const
     {
     case Qt::DisplayRole:
         return QString::fromStdString(node->label);
-        //case Qt::DecorationRole:
-        //    if (index.column() == 0)
-        //        return item->getIcon();
-        //    break;
     }
-
-    return QVariant();
-}
-
-QVariant TreeModel::headerData(int section, Qt::Orientation orientation, int role) const
-{
-    if (orientation == Qt::Horizontal && role == Qt::DisplayRole)
-        return QString::fromUtf8("MIB Дерево");
 
     return QVariant();
 }

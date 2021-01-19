@@ -1,5 +1,4 @@
 #pragma once
-#include <TCList.h>
 #include <Module.h>
 
 class TreeModel;
@@ -29,7 +28,6 @@ class Parser
         MODULE_SYNTAX_ERROR
     };
 
-    TCList _tclist;
     TreeModel* _tree;
 
     Objgroup _objgroups, _objects, _notifs;
@@ -37,6 +35,23 @@ class Parser
 
     size_t _line;
     std::string _moduleName;
+
+    struct TC
+    {
+        std::string		descriptor;
+        LT				type;
+        std::string     module;
+        std::string		hint;
+        std::string     reference;
+
+        EnumList		enums;
+        RangeList		ragnes;
+
+        std::string		description;
+    };
+
+    std::vector<TC> _tclist;
+
 
     struct UndefinedNode
     {
@@ -59,6 +74,7 @@ public:
     const ErrorInfo& lastErrorInfo();
 
     static std::string typeToStr(LT type);
+    static std::string getReplacementModule(const std::string& oldModule, const std::string& label = "");
 
 private:
 

@@ -8,21 +8,21 @@
 #include <fstream>
 #include <ui/ui_MIBManagmentDialog.h>
 
-MIBManagmentDialog::MIBManagmentDialog(QWidget * parent, const QString& LastFolderPath, const ModuleInfoTable& ModulesInfoTable) :
-    QDialog(parent),
+MIBManagmentDialog::MIBManagmentDialog(QWidget * parent, const ModuleMetaDataTable& ModulesInfoTable) :
+    QDialog(parent, Qt::WindowCloseButtonHint),
     _ui(new Ui::MIBManagmentWindow),
-    _lastFolderPath(LastFolderPath),
     _modulesInfoTable(ModulesInfoTable)
 {
     _ui->setupUi(this);
     _ui->loadModuleButton->setEnabled(false);
     _ui->unloadModuleButton->setEnabled(false);
     this->setWindowModality(Qt::WindowModal);
+    this->loadSavedData();
 
     for (auto& moduleInfoPair : _modulesInfoTable)
     {
         auto& moduleInfo = moduleInfoPair.second;
-        
+
         if (moduleInfo->needToLoad)
             _ui->loadedModulesList->addItem(QString::fromStdString(moduleInfo->moduleName));
         else
@@ -37,29 +37,28 @@ MIBManagmentDialog::MIBManagmentDialog(QWidget * parent, const QString& LastFold
 
     connect(_ui->availableModulesList, &QListWidget::itemSelectionChanged, [this]()
     {
-        if (_ui->availableModulesList->currentRow() != -1)
-            _ui->loadModuleButton->setEnabled(true);
-        else
+        auto selectedItems = _ui->availableModulesList->selectedItems();
+
+        if (selectedItems.isEmpty())
             _ui->loadModuleButton->setEnabled(false);
+        else
+            _ui->loadModuleButton->setEnabled(true);
     });
 
     connect(_ui->loadedModulesList, &QListWidget::itemSelectionChanged, [this]()
     {
-        if (_ui->loadedModulesList->currentRow() != -1)
-            _ui->unloadModuleButton->setEnabled(true);
-        else
+        auto selectedItems = _ui->loadedModulesList->selectedItems();
+
+        if (selectedItems.isEmpty())
             _ui->unloadModuleButton->setEnabled(false);
+        else
+            _ui->unloadModuleButton->setEnabled(true);
     });
 }
 
 MIBManagmentDialog::~MIBManagmentDialog()
 {
     delete _ui;
-}
-
-QString MIBManagmentDialog::getFolderPath()
-{
-    return _lastFolderPath;
 }
 
 MIBManagmentDialog::MIBEventList MIBManagmentDialog::getMIBEventList()
@@ -90,6 +89,7 @@ Q_SLOT void MIBManagmentDialog::selectFolder()
 
             messageBox.setButtonText(QMessageBox::Yes, QString::fromUtf8("Да"));
             messageBox.setButtonText(QMessageBox::No, QString::fromUtf8("Нет"));
+            messageBox.setEscapeButton(QMessageBox::No);
 
             auto reply = messageBox.exec();
 
@@ -116,7 +116,7 @@ Q_SLOT void MIBManagmentDialog::selectFolder()
         QDir dir(_lastFolderPath);
         dir.setFilter(QDir::Files | QDir::NoSymLinks | QDir::NoDotAndDotDot);
 
-        //ModuleInfoTable newModuleInfoTable;     
+        //ModuleMetaDataTable newModuleInfoTable;     
         for (auto const& fileInfo : dir.entryInfoList())
         {
             std::string modulePath = fileInfo.absoluteFilePath().toStdString();
@@ -134,22 +134,34 @@ Q_SLOT void MIBManagmentDialog::selectFolder()
                     {
                         _ui->availableModulesList->addItem(QString::fromStdString(moduleName));
 
+                        //Список импортируемых модулей
+                        Strs importedModules;
+                        //Список импортируемых cущностей
+                        Strs importedLabels;
+
                         //Получаем список импортируемых модулей
-                        Strs moduleImports;
                         while (token.type != LT::eSEMI && token.type != LT::eENDOFFILE)
                         {
-                            if (token.type == LT::eFROM)
+                            //Если импортируема сущность не является встроенной
+                            if (token.type == LT::eLABEL)
+                            {
+                                importedLabels.push_back(token.lexem);
+                            }
+                            else if (token.type == LT::eFROM)
                             {
                                 parser.parseToken(file, token);
 
-                                if (token.type == LT::eLABEL)
-                                    moduleImports.push_back(token.lexem);
+                                //Если имеет смысл импортировать этот модуль
+                                if (token.type == LT::eLABEL && !importedLabels.empty())
+                                    importedModules.push_back(token.lexem);
+
+                                importedLabels.clear();
                             }
 
                             parser.parseToken(file, token);
                         }
 
-                        _modulesInfoTable[moduleName] = ModuleInfo::Ptr(new ModuleInfo(moduleName, modulePath, false, moduleImports));
+                        _modulesInfoTable[moduleName] = ModuleMetaData::Ptr(new ModuleMetaData(moduleName, modulePath, false, importedModules));
                     }
                 }
             }
@@ -166,10 +178,10 @@ Q_SLOT void MIBManagmentDialog::loadModule()
 {
     auto moduleiItemsToLoad = _ui->availableModulesList->selectedItems();
 
-    for (auto const& moduleItem : moduleiItemsToLoad)
+    while (!moduleiItemsToLoad.isEmpty())
     {
-        // Отображаем все модули, которые будут загружены
-        addAllModules(moduleItem->text().toStdString());
+        addAllModules(moduleiItemsToLoad.first()->text().toStdString());
+        moduleiItemsToLoad = _ui->availableModulesList->selectedItems();
     }
 }
 
@@ -177,10 +189,10 @@ Q_SLOT void MIBManagmentDialog::unloadModule()
 {
     auto moduleiItemsToUnload = _ui->loadedModulesList->selectedItems();
 
-    for (auto const& moduleItem : moduleiItemsToUnload)
+    while (!moduleiItemsToUnload.isEmpty())
     {
-        std::string moduleName = moduleItem->text().toStdString();
-        removeAllModules(moduleName);
+        removeAllModules(moduleiItemsToUnload.first()->text().toStdString());
+        moduleiItemsToUnload = _ui->loadedModulesList->selectedItems();
     }
 }
 
@@ -200,10 +212,11 @@ Q_SLOT void MIBManagmentDialog::doneСonfigure()
             firstEvent.table = std::move(_modulesInfoTable);
     }
 
+    this->saveData();
     this->accept();
 }
 
-void MIBManagmentDialog::updateOrMoveToHistory(MIBEventType Type, ModuleInfoTable&& Data)
+void MIBManagmentDialog::updateOrMoveToHistory(MIBEventType Type, ModuleMetaDataTable&& Data)
 {
     if (Type == MIBEventType::Refresh)
     {
@@ -217,7 +230,7 @@ void MIBManagmentDialog::updateOrMoveToHistory(MIBEventType Type, ModuleInfoTabl
             if (it->type != MIBEventType::Refresh && it->table.begin()->first == moduleName)
             {
                 // Если противоположные операции, то делать ничего не нужно
-                if ((it->type == MIBEventType::Load && Type == MIBEventType::Unload) || 
+                if ((it->type == MIBEventType::Load && Type == MIBEventType::Unload) ||
                     (it->type == MIBEventType::Unload && Type == MIBEventType::Load))
                     _eventList.erase(it);
 
@@ -231,27 +244,71 @@ void MIBManagmentDialog::updateOrMoveToHistory(MIBEventType Type, ModuleInfoTabl
 
 void MIBManagmentDialog::addAllModules(const std::string& RootModuleName)
 {
-    QString ModuleName = QString::fromStdString(RootModuleName);
+    //если такого модуля нет в доступных
+    if (_modulesInfoTable.find(RootModuleName) == _modulesInfoTable.end())
+        return;
 
-    // Если модуль еще не загружен
-    if (_ui->loadedModulesList->findItems(ModuleName, Qt::MatchExactly).isEmpty())
+    QString qRootName = QString::fromStdString(RootModuleName);
+    std::list<std::string> checklist = { RootModuleName };
+
+    for (auto const& ModuleName : checklist)
     {
+        auto const& moduleImports = _modulesInfoTable.find(ModuleName)->second->moduleImports;
 
-        // Добавляем в историю модуль, который нужно загрузить
-        updateOrMoveToHistory(MIBEventType::Load, ModuleInfoTable{ { RootModuleName, nullptr } });
+        for (size_t i = 0, size = moduleImports.size(); i < size; ++i)
+        {
+            auto importedModule = moduleImports[i];
+            auto res = _modulesInfoTable.find(importedModule);
 
-        // Отображаем модуль в списке загруженных
-        _ui->loadedModulesList->addItem(ModuleName);
-        // Убираем модуль из списка доступных для загрузки
-        delete _ui->availableModulesList->findItems(ModuleName, Qt::MatchExactly).first();
+            if (res == _modulesInfoTable.end())
+            {
+                auto replacementModule = Parser::getReplacementModule(importedModule);
+                res = _modulesInfoTable.find(replacementModule);
+
+                if (res == _modulesInfoTable.end())
+                {
+                    QString message = QString::fromUtf8("Ошибка при загрузке ") +
+                        qRootName +
+                        QString::fromUtf8("\n\nОтсутсвует импортируемый модуль ") +
+                        QString::fromStdString(importedModule) +
+                        QString::fromUtf8("\nМодуль ") +
+                        qRootName +
+                        QString::fromUtf8(" и импортируемые им модули загружены не будут");
+
+                    QMessageBox::critical(this,
+                        QString::fromUtf8("Отсутствующий модуль"),
+                        message);
+
+                    auto item = _ui->availableModulesList->findItems(qRootName, Qt::MatchExactly).first();
+                    _ui->availableModulesList->setItemSelected(item, false);
+
+                    return;
+                }
+
+                importedModule = replacementModule;
+            }
+
+            if (std::find(checklist.begin(), checklist.end(), importedModule) == checklist.end())
+                checklist.push_back(importedModule);
+        }
     }
 
-    // Находим список импортируемых модулей
-    auto moduleImports = _modulesInfoTable.find(RootModuleName)->second->moduleImports;
+    for (auto const& moduleName : checklist)
+    {
+        QString ModuleName = QString::fromStdString(moduleName);
+        // Если модуль еще не загружен
+        if (_ui->loadedModulesList->findItems(ModuleName, Qt::MatchExactly).isEmpty())
+        {
 
-    // Добавляем их
-    for (auto const& moduleImport : moduleImports)
-        addAllModules(moduleImport);
+            // Добавляем в историю модуль, который нужно загрузить
+            updateOrMoveToHistory(MIBEventType::Load, ModuleMetaDataTable{ { moduleName, nullptr } });
+
+            // Отображаем модуль в списке загруженных
+            _ui->loadedModulesList->addItem(ModuleName);
+            // Убираем модуль из списка доступных для загрузки
+            delete _ui->availableModulesList->findItems(ModuleName, Qt::MatchExactly).first();
+        }
+    }
 }
 
 Strs MIBManagmentDialog::forWhichModulesIsRoot(const std::string & RootModuleName)
@@ -273,23 +330,13 @@ Strs MIBManagmentDialog::forWhichModulesIsRoot(const std::string & RootModuleNam
                 {
                     if (!_ui->loadedModulesList->findItems(QString::fromStdString(moduleName), Qt::MatchExactly).isEmpty())
                     {
-                        bool alreadyAdded = false;
-
-                        for (auto const& addedModule : res)
-                        {
-                            if (addedModule == moduleName)
-                            {
-                                alreadyAdded = true;
-                                break;
-                            }
-                        }
-
-                        if (!alreadyAdded)
+                        if (std::find(res.begin(), res.end(), moduleName) == res.end())
                         {
                             res.push_back(moduleName);
-                            break;
                         }
                     }
+
+                    break;
                 }
             }
         }
@@ -303,7 +350,7 @@ void MIBManagmentDialog::removeAllModules(const std::string & RootModuleName)
 {
     auto modules = forWhichModulesIsRoot(RootModuleName);
 
-    if (!modules.empty())
+    if (!modules.empty() && !_ui->warningBox->isChecked())
     {
         QString message = QString::fromUtf8("Кроме ") +
             QString::fromStdString(RootModuleName) +
@@ -329,14 +376,25 @@ void MIBManagmentDialog::removeAllModules(const std::string & RootModuleName)
         auto reply = messageBox.exec();
 
         if (reply == QMessageBox::No)
+        {
+            modules.push_back(RootModuleName);
+            for (size_t i = 0, size = modules.size(); i < size; ++i)
+            {
+
+
+                auto deselectedItem = _ui->loadedModulesList->findItems(QString::fromStdString(modules[i]), Qt::MatchExactly).first();
+                _ui->loadedModulesList->setItemSelected(deselectedItem, false);
+            }
+
             return;
+        }
     }
 
     modules.push_back(RootModuleName);
 
     for (auto const& moduleToRemove : modules)
     {
-        updateOrMoveToHistory(MIBEventType::Unload, ModuleInfoTable{ {moduleToRemove, nullptr} });
+        updateOrMoveToHistory(MIBEventType::Unload, ModuleMetaDataTable{ {moduleToRemove, nullptr} });
 
         QString ModuleName = QString::fromStdString(moduleToRemove);
         _ui->availableModulesList->addItem(ModuleName);
@@ -344,12 +402,49 @@ void MIBManagmentDialog::removeAllModules(const std::string & RootModuleName)
     }
 }
 
-MIBManagmentDialog::MIBEvent::MIBEvent(MIBEventType Type, const ModuleInfoTable & Table) :
+void MIBManagmentDialog::saveData()
+{
+    QDir dir;
+
+    if (!dir.exists("data"))
+        dir.mkpath("data");
+
+    QFile saveFile("data/mibmanagment.json");
+
+    if (!saveFile.open(QIODevice::WriteOnly))
+        return;
+
+    QJsonObject MIBDialogData;
+
+    MIBDialogData["LastFolderPath"] = _lastFolderPath;
+    MIBDialogData["DisableWarnings"] = _ui->warningBox->isChecked();
+
+    saveFile.write(QJsonDocument(MIBDialogData).toJson());
+}
+
+void MIBManagmentDialog::loadSavedData()
+{
+    QFile loadFile("data/mibmanagment.json");
+
+    if (!loadFile.open(QIODevice::ReadOnly))
+        return;
+
+    QJsonDocument loadDoc(QJsonDocument::fromJson(loadFile.readAll()));
+    QJsonObject MIBDialogData(loadDoc.object());
+
+    if (MIBDialogData.contains("LastFolderPath") && MIBDialogData["LastFolderPath"].isString())
+        _lastFolderPath = MIBDialogData["LastFolderPath"].toString();
+
+    if (MIBDialogData.contains("DisableWarnings") && MIBDialogData["DisableWarnings"].isBool())
+        _ui->warningBox->setChecked(MIBDialogData["DisableWarnings"].toBool());
+}
+
+MIBManagmentDialog::MIBEvent::MIBEvent(MIBEventType Type, const ModuleMetaDataTable & Table) :
     type(Type),
     table(Table)
 {}
 
-MIBManagmentDialog::MIBEvent::MIBEvent(MIBEventType Type, ModuleInfoTable && Table) :
+MIBManagmentDialog::MIBEvent::MIBEvent(MIBEventType Type, ModuleMetaDataTable && Table) :
     type(Type),
     table(std::move(Table))
 {}

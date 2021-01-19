@@ -24,10 +24,10 @@ public:
     void removeModule(const std::string& name);
 	void loadModule(const std::string& name);
 
-	void updateModuleInfo(const ModuleInfo::Ptr& ModuleInfo);
+    void addModuleInfo(const ModuleMetaData::Ptr& data);
+	//void updateModuleInfo(const ModuleInfo::Ptr& ModuleInfo);
 
     QVariant data(const QModelIndex& index, int role) const override;
-    QVariant headerData(int section, Qt::Orientation orientation, int role = Qt::DisplayRole) const override;
 
     QModelIndex index(int row, int column, const QModelIndex& parent = QModelIndex()) const override;
     QModelIndex parent(const QModelIndex& index) const override;

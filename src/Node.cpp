@@ -1,14 +1,5 @@
 #include <Node.h>
 
-
-
-//Node::Node()
-//{}
-//
-//
-//Node::~Node()
-//{}
-
 Node::Node() :
     subid(0),
     type(LT::eNA),

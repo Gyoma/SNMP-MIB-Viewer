@@ -1,8 +1,7 @@
 cmake_minimum_required(VERSION 3.10)
-#set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
-set(PROJECT_NAME netsnmp-parser)
+set(PROJECT_NAME MIB-Browser)
 project(${PROJECT_NAME})
 
 set(CMAKE_AUTOMOC ON)
@@ -24,7 +23,6 @@ set(PROJECT_FILES
 	include/Module.h
 	include/Node.h
 	include/Parser.h
-	include/TCList.h
 	include/TreeModel.h
 	include/MIBBrowserWindow.h
 	include/MIBManagmentDialog.h
@@ -32,7 +30,6 @@ set(PROJECT_FILES
 	src/Module.cpp
 	src/Node.cpp
 	src/Parser.cpp
-	src/TCList.cpp
 	src/TreeModel.cpp
 	src/MIBBrowserWindow.cpp
 	src/MIBManagmentDialog.cpp

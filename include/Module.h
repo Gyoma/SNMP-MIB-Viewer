@@ -1,27 +1,31 @@
 #pragma once
 #include <Node.h>
 
-struct ModuleInfo
-{
-    using Ptr = std::shared_ptr<ModuleInfo>;
 
-	ModuleInfo(const std::string& ModuleName = "", 
+struct ModuleMetaData
+{
+    using Ptr = std::shared_ptr<ModuleMetaData>;
+
+    ModuleMetaData(const std::string& ModuleName = "",
         std::string ModulePath = "", 
         bool NeedToLoad = false,
         const Strs& ModuleImprots = {});
-	ModuleInfo(const ModuleInfo& other);
-	ModuleInfo(ModuleInfo&& other) noexcept;
+    ModuleMetaData(const ModuleMetaData& other);
+    ModuleMetaData(ModuleMetaData&& other) noexcept;
 
-    ModuleInfo& operator=(const ModuleInfo& other);
-    ModuleInfo& operator=(ModuleInfo&& other) noexcept;
+    ModuleMetaData& operator=(const ModuleMetaData& other);
+    ModuleMetaData& operator=(ModuleMetaData&& other) noexcept;
 
-	std::string moduleName;
-	std::string modulePath;
-    Strs        moduleImports;
-	bool needToLoad = false;
+	std::string     moduleName;
+	std::string     modulePath;
+    Strs            moduleImports;
+	bool            needToLoad;
 };
 
-using ModuleInfoTable = std::unordered_map<std::string, ModuleInfo::Ptr>;
+using ModuleMetaDataTable = std::unordered_map<std::string, ModuleMetaData::Ptr>;
+
+
+
 
 struct ModuleImport
 {
@@ -70,8 +74,6 @@ public:
 
     void addModule(const Module::Ptr& Module);
     bool removeModule(const std::string& Name);
-
-	void updateModuleInfo(const ModuleInfo::Ptr& ModuleInfo);
 
 private:
 

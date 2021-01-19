@@ -54,18 +54,6 @@ bool ModuleTable::removeModule(const std::string& Name)
     return _modules.erase(Name);
 }
 
-void ModuleTable::updateModuleInfo(const ModuleInfo::Ptr& ModuleInfo)
-{
-    auto module = findModule(ModuleInfo->moduleName);
-
-    if (module)
-    {
-        module->fileName = ModuleInfo->modulePath;
-    }
-    else
-        addModule(Module::Ptr(new Module(ModuleInfo->moduleName, ModuleInfo->modulePath)));
-}
-
 ModuleImport::ModuleImport()
 {}
 
@@ -138,21 +126,22 @@ Module::Module(Module&& other) noexcept :
     other.isLinked = false;
 }
 
-ModuleInfo::ModuleInfo(const std::string& ModuleName, std::string ModulePath, bool NeedToLoad, const Strs& ModuleImprots) :
+ModuleMetaData::ModuleMetaData(const std::string& ModuleName, std::string ModulePath, 
+    bool NeedToLoad, const Strs& ModuleImprots) :
     moduleName(ModuleName),
     modulePath(ModulePath),
     moduleImports(ModuleImprots),
     needToLoad(NeedToLoad)
 {}
 
-ModuleInfo::ModuleInfo(const ModuleInfo& other) :
-    ModuleInfo(other.moduleName,
+ModuleMetaData::ModuleMetaData(const ModuleMetaData& other) :
+    ModuleMetaData(other.moduleName,
         other.modulePath,
         other.needToLoad,
         other.moduleImports)
 {}
 
-ModuleInfo::ModuleInfo(ModuleInfo&& other) noexcept
+ModuleMetaData::ModuleMetaData(ModuleMetaData&& other) noexcept
 {
     moduleName = std::move(other.moduleName);
     modulePath = std::move(other.modulePath);
@@ -161,7 +150,7 @@ ModuleInfo::ModuleInfo(ModuleInfo&& other) noexcept
     other.needToLoad = false;
 }
 
-ModuleInfo& ModuleInfo::operator=(const ModuleInfo& other)
+ModuleMetaData& ModuleMetaData::operator=(const ModuleMetaData& other)
 {
     if (this != &other)
     {
@@ -173,7 +162,7 @@ ModuleInfo& ModuleInfo::operator=(const ModuleInfo& other)
     return *this;
 }
 
-ModuleInfo& ModuleInfo::operator=(ModuleInfo&& other) noexcept
+ModuleMetaData& ModuleMetaData::operator=(ModuleMetaData&& other) noexcept
 {
     if (this != &other)
     {

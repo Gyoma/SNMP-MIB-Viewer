@@ -1,8 +1,6 @@
 #pragma once
 #include <GlobalTypes.h>
 
-
-
 struct Node
 {
     using Ptr = std::shared_ptr<Node>;

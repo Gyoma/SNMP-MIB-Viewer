@@ -21,8 +21,8 @@ public:
 
     struct MIBEvent
     {
-        MIBEvent(MIBEventType Type = MIBEventType::None, const ModuleInfoTable& Table = {});
-        MIBEvent(MIBEventType Type, ModuleInfoTable&& Table);
+        MIBEvent(MIBEventType Type = MIBEventType::None, const ModuleMetaDataTable& Table = {});
+        MIBEvent(MIBEventType Type, ModuleMetaDataTable&& Table);
         MIBEvent(const MIBEvent& other);
         MIBEvent(MIBEvent&& other) noexcept;
 
@@ -30,20 +30,17 @@ public:
         MIBEvent& operator=(MIBEvent&& other) noexcept;
 
         MIBEventType type;
-        ModuleInfoTable table;
+        ModuleMetaDataTable table;
     };
 
     using MIBEventList = std::vector<MIBEvent>;
 
-    explicit MIBManagmentDialog(QWidget* parent = nullptr, 
-        const QString& LastFolderPath = "", 
-        const ModuleInfoTable& ModulesInfoTable = {});
+    explicit MIBManagmentDialog(QWidget* parent = nullptr,  
+        const ModuleMetaDataTable& ModulesInfoTable = {});
 
 	~MIBManagmentDialog();
 
-	QString getFolderPath();
     MIBEventList getMIBEventList();
-
 	Q_SLOT void selectFolder();
 	Q_SLOT void loadModule();
 	Q_SLOT void unloadModule();
@@ -52,13 +49,16 @@ public:
 
 private:
 
-    void updateOrMoveToHistory(MIBEventType Type, ModuleInfoTable&& Data);
+    void saveData();
+    void loadSavedData();
+
+    void updateOrMoveToHistory(MIBEventType Type, ModuleMetaDataTable&& Data);
     void addAllModules(const std::string& RootModuleName);
     Strs forWhichModulesIsRoot(const std::string& RootModuleName);
     void removeAllModules(const std::string& RootModuleName);
 
 	Ui::MIBManagmentWindow* _ui;
 	QString                 _lastFolderPath;
-    ModuleInfoTable         _modulesInfoTable;
+    ModuleMetaDataTable         _modulesInfoTable;
     MIBEventList               _eventList;
 };
