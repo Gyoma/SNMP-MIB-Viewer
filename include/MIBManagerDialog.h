@@ -4,10 +4,10 @@
 
 namespace Ui
 {
-	class MIBManagmentWindow;
+	class MIBManagerWindow;
 }
 
-class MIBManagmentDialog: public QDialog
+class MIBManagerDialog: public QDialog
 {
 public:
 
@@ -21,8 +21,11 @@ public:
 
     struct MIBEvent
     {
-        MIBEvent(MIBEventType Type = MIBEventType::None, const ModuleMetaDataTable& Table = {});
-        MIBEvent(MIBEventType Type, ModuleMetaDataTable&& Table);
+        //MIBEvent(MIBEventType Type, const  ModuleMetaDataTable::Ptr& Table = nullptr);
+        //MIBEvent(MIBEventType Type, ModuleMetaDataTable::Ptr&& Table);
+
+        MIBEvent(MIBEventType Type, const std::string& ModuleName = "");
+        MIBEvent(MIBEventType Type, std::string&& ModuleName);
         MIBEvent(const MIBEvent& other);
         MIBEvent(MIBEvent&& other) noexcept;
 
@@ -30,15 +33,16 @@ public:
         MIBEvent& operator=(MIBEvent&& other) noexcept;
 
         MIBEventType type;
-        ModuleMetaDataTable table;
+        std::string moduleName;
+        //ModuleMetaDataTable::Ptr table;
     };
 
     using MIBEventList = std::vector<MIBEvent>;
 
-    explicit MIBManagmentDialog(QWidget* parent = nullptr,  
-        const ModuleMetaDataTable& ModulesInfoTable = {});
+    explicit MIBManagerDialog(QWidget* parent = nullptr,  
+        const ModuleMetaDataTable::Ptr& ModulesDataTable = nullptr);
 
-	~MIBManagmentDialog();
+	~MIBManagerDialog();
 
     MIBEventList getMIBEventList();
 	Q_SLOT void selectFolder();
@@ -52,13 +56,14 @@ private:
     void saveData();
     void loadSavedData();
 
-    void updateOrMoveToHistory(MIBEventType Type, ModuleMetaDataTable&& Data);
+    //void updateOrMoveToHistory(MIBEventType Type, ModuleMetaDataTable::Ptr&& Data);
+    void updateOrMoveToHistory(MIBEventType Type, std::string&& Data);
     void addAllModules(const std::string& RootModuleName);
     Strs forWhichModulesIsRoot(const std::string& RootModuleName);
     void removeAllModules(const std::string& RootModuleName);
 
-	Ui::MIBManagmentWindow* _ui;
-	QString                 _lastFolderPath;
-    ModuleMetaDataTable         _modulesInfoTable;
-    MIBEventList               _eventList;
+	Ui::MIBManagerWindow*       _ui;
+	QString                     _lastFolderPath;
+    ModuleMetaDataTable::Ptr    _modulesDataTable;
+    MIBEventList                _eventList;
 };

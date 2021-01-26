@@ -15,7 +15,7 @@ find_package(Qt5 COMPONENTS Core Gui Widgets REQUIRED)
 
 set(PROJECT_UI
 	src/ui/MIBBrowserWindow.ui
-	src/ui/MIBManagmentDialog.ui
+	src/ui/MIBManagerDialog.ui
 )
 
 set(PROJECT_FILES
@@ -25,14 +25,14 @@ set(PROJECT_FILES
 	include/Parser.h
 	include/TreeModel.h
 	include/MIBBrowserWindow.h
-	include/MIBManagmentDialog.h
+	include/MIBManagerDialog.h
 	src/main.cpp
 	src/Module.cpp
 	src/Node.cpp
 	src/Parser.cpp
 	src/TreeModel.cpp
 	src/MIBBrowserWindow.cpp
-	src/MIBManagmentDialog.cpp
+	src/MIBManagerDialog.cpp
 )
 
 add_executable(

@@ -13,7 +13,7 @@ public:
     using Ptr = std::shared_ptr<TreeModel>;
 	using WPtr = std::weak_ptr<TreeModel>;
 
-    TreeModel(const ModuleTable::Ptr& ModuleTable = nullptr);
+    TreeModel(const ModuleTable::Ptr& moduleTable = ModuleTable::Ptr(new ModuleTable));
 
     Node::Ptr findNode(const std::string& name, const std::string& module = std::string()) const;
     Module::Ptr findModule(const std::string& name) const;
@@ -25,7 +25,8 @@ public:
 	void loadModule(const std::string& name);
 
     void addModuleInfo(const ModuleMetaData::Ptr& data);
-	//void updateModuleInfo(const ModuleInfo::Ptr& ModuleInfo);
+    void addModule(const Module::Ptr& module);
+    void clear();
 
     QVariant data(const QModelIndex& index, int role) const override;
 
@@ -36,8 +37,6 @@ public:
     int columnCount(const QModelIndex& parent = QModelIndex()) const override;
 
 private:
-
-//#define ROOTS_MODULE_NAME "#roots#"
 
     Node* getNode(const QModelIndex& index) const;
     QModelIndex getIndex(const Node::Ptr& node);

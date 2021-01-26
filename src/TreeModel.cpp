@@ -21,7 +21,7 @@ TreeModel::TreeModel(const ModuleTable::Ptr& moduleTable) :
 
     _header->children = { ccit, iso, joint };
 
-    Module::Ptr mibRootsModule(new Module);
+    Module::Ptr mibRootsModule(new Module(ROOTS_MODULE_NAME));
 
     for (auto const& root : _header->children)
         mibRootsModule->nodes[root->label] = root;
@@ -76,9 +76,9 @@ void TreeModel::linkupNodes(NodeList& nodes)
                         //находим место для вставки
                         auto lower = std::lower_bound(pchildren.begin(), pchildren.end(), np,
                             [](const Node::Ptr& npl, const Node::Ptr& npr)
-                        {
-                            return npl->subid < npr->subid;
-                        });
+                            {
+                                return npl->subid < npr->subid;
+                            });
 
                         pchildren.insert(lower, np);
 
@@ -102,17 +102,23 @@ void TreeModel::linkupNodes(NodeList& nodes)
                 else
                 {
                     auto& existingModules = tnp->modules;
-                    auto const& moduleName = np->modules.front();
-                    size_t size = existingModules.size(), i = 0;
 
-                    for (; i < size; ++i)
+                    for (auto& moduleName : np->modules)
                     {
-                        if (existingModules[i] == moduleName)
-                            break;
-                    }
+                        auto mp = findModule(moduleName);
 
-                    if (i == size)
-                        existingModules.push_back(moduleName);
+                        if (mp)
+                        {
+                            auto const& moduleName = mp->moduleName;
+
+                            if (std::find(existingModules.begin(), existingModules.end(), moduleName) == existingModules.end())
+                            {
+                                mp->nodes[np->label] = tnp;
+                                mp->isLinked = true;
+                                existingModules.push_back(moduleName);
+                            }
+                        }
+                    }
 
                     nodeit = nodes.erase(nodeit);
                 }
@@ -127,6 +133,8 @@ void TreeModel::unlinkModule(const std::string& moduleName)
 
     if (mp && mp->isLinked)
     {
+        emit layoutAboutToBeChanged();
+
         for (auto const& nodep : mp->nodes)
         {
             auto const& np = nodep.second;
@@ -134,16 +142,7 @@ void TreeModel::unlinkModule(const std::string& moduleName)
 
             if (parent) //just in case
             {
-                bool inSameModule = false;
-
-                for (auto const& module : parent->modules)
-                    if (module == moduleName)
-                    {
-                        inSameModule = true;
-                        break;
-                    }
-
-                if (!inSameModule)
+                if (np->modules.size() == 1)
                 {
                     auto& children = parent->children;
 
@@ -155,6 +154,11 @@ void TreeModel::unlinkModule(const std::string& moduleName)
                         }
 
                     np->parent.reset();
+                }
+                else
+                {
+                    auto& modules = np->modules;
+                    modules.erase(std::find(modules.begin(), modules.end(), moduleName));
                 }
             }
         }
@@ -168,52 +172,45 @@ void TreeModel::linkupModule(const std::string& moduleName)
 {
     auto mp = findModule(moduleName);
 
+    this->persistentIndexList();
+
     if (mp && !mp->isLinked)
     {
+        emit layoutAboutToBeChanged();
+
         if (!mp->isParsed)
         {
             loadModule(mp->moduleName);
-            emit layoutChanged();
-            return;
         }
-
-        for (auto const& nodep : mp->nodes)
+        else
         {
-            auto const& np = nodep.second;
-
-            if (np->parent.lock() == nullptr)
+            for (auto const& nodep : mp->nodes)
             {
-                auto parent = findNode(np->parentName);
+                auto const& np = nodep.second;
 
-                if (parent)
+                if (np->parent.lock() == nullptr)
                 {
-                    np->parent = parent;
-                    auto& pchildren = parent->children;
+                    auto parent = findNode(np->parentName);
 
-                    //находим место для вставки
-                    auto lower = std::lower_bound(pchildren.begin(), pchildren.end(), np,
-                        [](const Node::Ptr& npl, const Node::Ptr& npr)
+                    if (parent)
                     {
-                        return npl->subid < npr->subid;
-                    });
+                        np->parent = parent;
+                        auto& pchildren = parent->children;
 
-                    pchildren.insert(lower, np);
+                        //находим место для вставки
+                        auto lower = std::lower_bound(pchildren.begin(), pchildren.end(), np,
+                            [](const Node::Ptr& npl, const Node::Ptr& npr)
+                            {
+                                return npl->subid < npr->subid;
+                            });
 
-                    for (auto const& module : parent->modules)
-                    {
-                        auto parentmp = findModule(module);
-
-                        if (parentmp)
-                        {
-                            if (!parentmp->isLinked)
-                                linkupModule(module);
-
-                            mp->isLinked = true;
-                        }
+                        pchildren.insert(lower, np);
+                        mp->isLinked = true;
                     }
                 }
             }
         }
+
         emit layoutChanged();
     }
 }
@@ -259,25 +256,62 @@ void TreeModel::loadModule(const std::string& name)
         std::ifstream file(mp->fileName);
 
         if (!file.is_open())
+        {
+            QMessageBox::critical(nullptr,
+                QString::fromUtf8("Ошибка загрузки модуля"),
+                QString::fromUtf8("Модуль ") +
+                QString::fromStdString(name) +
+                QString::fromUtf8(" не был найден по указанному пути:\n") +
+                QString::QString::fromStdString(mp->fileName)
+            );
             return;
+        }
+
+        emit layoutAboutToBeChanged();
 
         _parser->parse(file);
 
         auto const& errInfo = _parser->lastErrorInfo();
 
         if (errInfo.isError)
+        {
             QMessageBox::critical(nullptr,
-                QString::fromUtf8("Ошибка загрузка модуля"),
+                QString::fromUtf8("Ошибка загрузки модуля"),
                 QString::fromStdString(errInfo.description));
+        }
 
         emit layoutChanged();
     }
 }
 
-void TreeModel::addModuleInfo(const ModuleMetaData::Ptr & data)
+void TreeModel::addModuleInfo(const ModuleMetaData::Ptr& data)
 {
     if (_moduleTable)
         _moduleTable->addModule(Module::Ptr(new Module(data->moduleName, data->modulePath)));
+}
+
+void TreeModel::addModule(const Module::Ptr & module)
+{
+    if (_moduleTable)
+        _moduleTable->addModule(module);
+}
+
+void TreeModel::clear()
+{
+    if (_moduleTable)
+    {
+        _moduleTable->clear();
+
+        Module::Ptr mibRootsModule(new Module(ROOTS_MODULE_NAME));
+
+        for (auto const& root : _header->children)
+        {
+            root->children.clear();
+            mibRootsModule->nodes[root->label] = root;
+        }
+       
+        _moduleTable->addModule(mibRootsModule);
+    }
 }
 
 QVariant TreeModel::data(const QModelIndex& index, int role) const

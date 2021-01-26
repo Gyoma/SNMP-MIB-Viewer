@@ -39,7 +39,7 @@ class Parser
     struct TC
     {
         std::string		descriptor;
-        LT				type;
+        LT				syntax;
         std::string     module;
         std::string		hint;
         std::string     reference;
@@ -50,7 +50,8 @@ class Parser
         std::string		description;
     };
 
-    std::vector<TC> _tclist;
+    using TCList = std::vector<TC>;
+    TCList _tclist;
 
 
     struct UndefinedNode
@@ -69,12 +70,13 @@ public:
 
     Parser(TreeModel* tree = nullptr);
 
-    void parse(std::ifstream& file);
+    NodeList parse(std::ifstream& file);
     void parseToken(std::ifstream& file, Token& token);
-    const ErrorInfo& lastErrorInfo();
+    ErrorInfo lastErrorInfo();
+    TCList tcList();
 
     static std::string typeToStr(LT type);
-    static std::string getReplacementModule(const std::string& oldModule, const std::string& label = "");
+    static Strs getModuleReplacements(const std::string& oldModule);
 
 private:
 
@@ -109,11 +111,10 @@ private:
     bool complianceLookup(const std::string& name, const std::string& moduleName = std::string());
 
     LoadStatus readModuleInternal(const std::string& moduleName);
-    LoadStatus readImportReplacements(const std::string& oldModuleName, Module::Imports& module);
     LoadStatus readModuleReplacements(const std::string& oldModuleName);
 
     void scanObjlist(const NodeList& root, const Module::Ptr& mp, Objgroup& list);
     void resolveSyntax();
 
-    std::string formError(const std::string& str, const std::string& lexem);
+    std::string formError(const std::string& str, const std::string& lexem = "");
 };

@@ -5,13 +5,14 @@
 #include <QFile>
 #include <QItemSelection>
 #include <MIBBrowserWindow.h>
-#include <MIBManagmentDialog.h>
+#include <MIBManagerDialog.h>
 #include <ui/ui_MIBBrowserWindow.h>
 
 MIBBrowserWindow::MIBBrowserWindow(QWidget* parent) :
     QMainWindow(parent),
     _ui(new Ui::MainMIBWindow),
-    _treeModel(new TreeModel(ModuleTable::Ptr(new ModuleTable)))
+    _treeModel(new TreeModel(ModuleTable::Ptr(new ModuleTable))),
+    _modulesDataTable(new ModuleMetaDataTable)
 {
     _ui->setupUi(this);
     _ui->treeView->setModel(_treeModel.get());
@@ -34,7 +35,7 @@ MIBBrowserWindow::~MIBBrowserWindow()
 
 Q_SLOT void MIBBrowserWindow::execMIBManagment()
 {
-    MIBManagmentDialog moduleDialog(this, _modulesInfoTable);
+    MIBManagerDialog moduleDialog(this, _modulesDataTable);
 
     if (moduleDialog.exec())
     {
@@ -42,34 +43,26 @@ Q_SLOT void MIBBrowserWindow::execMIBManagment()
         {
             switch (event.type)
             {
-            case MIBManagmentDialog::MIBEventType::Refresh: //была загружена другая папка или нужно перезагрузить текущую
+            case MIBManagerDialog::MIBEventType::Refresh: //была загружена другая папка или нужно перезагрузить текущую
             {
-                //очищаем всю текущую информацию в дереве
-                for (auto const& moduleInfo : _modulesInfoTable)
-                    _treeModel->removeModule(moduleInfo.second->moduleName);
+                _treeModel->clear();
 
-                //получаем новый список информации о модулях
-                _modulesInfoTable = std::move(event.table);
-
-                //заносим сперва всю информацию о путях до модулей и их именах
-                for (auto const& moduleInfo : _modulesInfoTable)
-                    _treeModel->addModuleInfo(moduleInfo.second);
+                for (auto const& moduleData : _modulesDataTable->asVector())
+                    _treeModel->addModuleInfo(moduleData);
 
                 break;
             }
-            case MIBManagmentDialog::MIBEventType::Load: //модуль нужно загрузить
+            case MIBManagerDialog::MIBEventType::Load: //модуль нужно загрузить
             {
-                auto const& moduleName = event.table.begin()->first;
-                _modulesInfoTable[moduleName]->needToLoad = true;
-                _treeModel->linkupModule(moduleName);
+                _modulesDataTable->findModuleData(event.moduleName)->needToLoad = true;
+                _treeModel->linkupModule(event.moduleName);
 
                 break;
             }
-            case MIBManagmentDialog::MIBEventType::Unload: //модуль нужно отсоединить
+            case MIBManagerDialog::MIBEventType::Unload: //модуль нужно отсоединить
             {
-                auto const& moduleName = event.table.begin()->first;
-                _modulesInfoTable[moduleName]->needToLoad = false;
-                _treeModel->unlinkModule(moduleName);
+                _modulesDataTable->findModuleData(event.moduleName)->needToLoad = false;
+                _treeModel->unlinkModule(event.moduleName);
 
                 break;
             }
@@ -84,12 +77,8 @@ Q_SLOT void MIBBrowserWindow::execMIBManagment()
 Q_SLOT void MIBBrowserWindow::showRelevantNodeInfo(const QModelIndex& index)
 {
     if (!index.isValid())
-    {
-        _ui->propertiesScrollArea->setVisible(false);
         return;
-    }
 
-    _ui->propertiesScrollArea->setVisible(true);
     Node* node = static_cast<Node*>(index.internalPointer());
 
     if (!node->label.empty())
@@ -122,26 +111,26 @@ Q_SLOT void MIBBrowserWindow::showRelevantNodeInfo(const QModelIndex& index)
         _ui->modulesWidget->setVisible(false);
 
 
-    //if (node->type != LT::eNA)
+    //if (node->type != LT::NA)
     //{
     _ui->typeWidget->setVisible(true);
 
-    if (node->type == LT::eNA)
+    if (node->syntax == LT::NA)
     {
         _ui->typeLine->setText(QString::fromUtf8("Ветвь"));
     }
-    else if (node->type == LT::eSEQUENCE && node->children.size() == 1 && node->children[0]->type == LT::eSEQUENCE)
+    else if (node->syntax == LT::SEQUENCE && node->children.size() == 1 && node->children[0]->syntax == LT::SEQUENCE)
     {
         _ui->typeLine->setText(QString::fromStdString("SEQUENCE OF " + node->children[0]->label));
     }
     else
-        _ui->typeLine->setText(QString::fromStdString(Parser::typeToStr(node->type)));
+        _ui->typeLine->setText(QString::fromStdString(Parser::typeToStr(node->syntax)));
     //}
     //else
     //    _ui->typeWidget->setVisible(false);
 
 
-    if (node->access != LT::eNA)
+    if (node->access != LT::NA)
     {
         _ui->accessWidget->setVisible(true);
         _ui->accessLine->setText(QString::fromStdString(Parser::typeToStr(node->access)));
@@ -150,7 +139,7 @@ Q_SLOT void MIBBrowserWindow::showRelevantNodeInfo(const QModelIndex& index)
         _ui->accessWidget->setVisible(false);
 
 
-    if (node->status != LT::eNA)
+    if (node->status != LT::NA)
     {
         _ui->statusWidget->setVisible(true);
         _ui->statusLine->setText(QString::fromStdString(Parser::typeToStr(node->status)));
@@ -296,7 +285,7 @@ Q_SLOT void MIBBrowserWindow::shrinkViewToFit()
 
 void MIBBrowserWindow::loadSavedData()
 {
-    QFile loadFile("data/modulesmeta.json");
+    QFile loadFile("data/modulesdata.json");
 
     if (!loadFile.open(QIODevice::ReadOnly))
         return;
@@ -334,7 +323,7 @@ void MIBBrowserWindow::loadSavedData()
             continue;
 
         ModuleMetaData::Ptr moduleMetaData(new ModuleMetaData(ModuleName, ModulePath, NeedToLoad, ModuleImports));
-        _modulesInfoTable[ModuleName] = moduleMetaData;
+        _modulesDataTable->addModuleData(moduleMetaData);// [ModuleName] = moduleMetaData;
 
         _treeModel->addModuleInfo(moduleMetaData);
 
@@ -353,7 +342,7 @@ void MIBBrowserWindow::saveData()
     if (!dir.exists("data"))
         dir.mkpath("data");
 
-    QFile saveFile("data/modulesmeta.json");
+    QFile saveFile("data/modulesdata.json");
 
     if (!saveFile.open(QIODevice::WriteOnly))
         return;
@@ -361,9 +350,9 @@ void MIBBrowserWindow::saveData()
     QJsonArray modulesInfoList;
     QJsonObject modulesInfoItem;
 
-    for (auto& moduleInfoPair : _modulesInfoTable)
+    for (auto& moduleInfo : _modulesDataTable->asVector())
     {
-        auto& moduleInfo = moduleInfoPair.second;
+        //auto& moduleInfo = moduleInfoPair.second;
         QJsonArray moduleImports;
 
         modulesInfoItem["ModuleName"] = QString::fromStdString(moduleInfo->moduleName);

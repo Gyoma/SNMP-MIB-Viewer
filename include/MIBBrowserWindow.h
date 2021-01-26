@@ -30,5 +30,5 @@ private:
 
     Ui::MainMIBWindow*				_ui;
     TreeModel::Ptr					_treeModel;
-    ModuleMetaDataTable             _modulesInfoTable;
+    ModuleMetaDataTable::Ptr        _modulesDataTable;
 };

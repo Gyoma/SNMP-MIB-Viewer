@@ -65,7 +65,7 @@
         <item row="0" column="0">
          <widget class="QPushButton" name="MIBButton">
           <property name="text">
-           <string>Управление модулями</string>
+           <string>MIBs</string>
           </property>
          </widget>
         </item>

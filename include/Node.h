@@ -19,8 +19,8 @@ struct Node
     Strs						modules;  /* The module containing this node */
     std::string					parentName; /* The parent's textual name */
     WPtr						parent;
-    //int							tc_index = -1; /* index into tclist (-1 if NA) */
     LT							type;   /* The type of object this represents */
+    LT                          syntax;
     LT							access;
     LT							status;
     EnumList					enums; /* (optional) list of enumerated integers */
