@@ -1,9 +1,140 @@
 #include "Parser.h"
-#include <iostream>
+#include "TreeModel.h"
+#include <fstream>
 
 
-Parser::Parser(Tree::Ptr tree) :
-    _tree(tree),
+const LexemTypeTable Parser::_lexemTable = {
+        { "obsolete",				LT::OBSOLETE },
+        { "Opaque",					LT::OPAQUE },
+        { "optional" ,				LT::OPTIONAL },
+        { "LAST-UPDATED",			LT::LASTUPDATED },
+        { "ORGANIZATION",			LT::ORGANIZATION },
+        { "CONTACT-INFO",			LT::CONTACTINFO },
+        { "MODULE-IDENTITY",		LT::MODULEIDENTITY },
+        { "MODULE-COMPLIANCE",		LT::COMPLIANCE },
+        { "DEFINITIONS",			LT::DEFINITIONS },
+        { "END",					LT::END },
+        { "AUGMENTS",				LT::AUGMENTS },
+        { "not-accessible",			LT::NOACCESS },
+        { "write-only",				LT::WRITEONLY },
+        { "NsapAddress",			LT::NSAPADDRESS },
+        { "UNITS",					LT::UNITS },
+        { "REFERENCE",				LT::REFERENCE },
+        { "NUM-ENTRIES" ,			LT::NUMENTRIES },
+        { "BITSTRING",				LT::BITSTRING },
+        { "BIT",					LT::CONTINUE },
+        { "BITS",					LT::BITSTRING },
+        { "Counter64",				LT::COUNTER64 },
+        { "TimeTicks",				LT::TIMETICKS },
+        { "NOTIFICATION-TYPE",		LT::NOTIFTYPE },
+        { "OBJECT-GROUP" ,			LT::OBJGROUP },
+        { "OBJECT-IDENTITY",		LT::OBJIDENTITY },
+        { "IDENTIFIER",				LT::IDENTIFIER },
+        { "OBJECT",					LT::OBJECT },
+        { "NetworkAddress",			LT::NETADDR },
+        { "Gauge",					LT::GAUGE },
+        { "Gauge32",				LT::GAUGE },
+        { "Unsigned32",				LT::UNSIGNED32 },
+        { "read-write",				LT::READWRITE },
+        { "read-create",			LT::READCREATE },
+        { "OCTETSTRING",			LT::OCTETSTR },
+        { "OCTET",					LT::CONTINUE },
+        { "OF",						LT::OF },
+        { "SEQUENCE",				LT::SEQUENCE },
+        { "NULL",					LT::NUL },
+        { "IpAddress",				LT::IPADDR },
+        { "UInteger32",				LT::UINTEGER32 },
+        { "INTEGER",				LT::INTEGER },
+        { "Integer32",				LT::INTEGER32 },
+        { "Counter",				LT::COUNTER },
+        { "Counter32",				LT::COUNTER },
+        { "read-only",				LT::READONLY },
+        { "DESCRIPTION",			LT::DESCRIPTION },
+        { "INDEX",					LT::INDEX },
+        { "DEFVAL",					LT::DEFVAL },
+        { "deprecated",				LT::DEPRECATED },
+        { "SIZE",					LT::SIZE },
+        { "MAX-ACCESS",				LT::ACCESS },
+        { "ACCESS",					LT::ACCESS },
+        { "mandatory",				LT::MANDATORY },
+        { "current",				LT::CURRENT },
+        { "STATUS",					LT::STATUS },
+        { "SYNTAX",					LT::SYNTAX },
+        { "OBJECT-TYPE",			LT::OBJTYPE },
+        { "TRAP-TYPE",				LT::TRAPTYPE },
+        { "ENTERPRISE",				LT::ENTERPRISE },
+        { "BEGIN",					LT::BEGIN },
+        { "IMPORTS",				LT::IMPORTS },
+        { "EXPORTS",				LT::EXPORTS },
+        { "accessible-for-notify",	LT::ACCNOTIFY },
+        { "TEXTUAL-CONVENTION",		LT::CONVENTION },
+        { "NOTIFICATION-GROUP",		LT::NOTIFGROUP },
+        { "DISPLAY-HINT",			LT::DISPLAYHINT },
+        { "FROM",					LT::FROM },
+        { "AGENT-CAPABILITIES",		LT::AGENTCAP },
+        { "MACRO",					LT::MACRO },
+        { "IMPLIED",				LT::IMPLIED },
+        { "SUPPORTS",				LT::SUPPORTS },
+        { "INCLUDES",				LT::INCLUDES },
+        { "VARIATION",				LT::VARIATION },
+        { "REVISION",				LT::REVISION },
+        { "not-implemented",		LT::NOTIMPL },
+        { "OBJECTS",				LT::OBJECTS },
+        { "NOTIFICATIONS",			LT::NOTIFICATIONS },
+        { "MODULE",					LT::MODULE },
+        { "MIN-ACCESS",				LT::MINACCESS },
+        { "PRODUCT-RELEASE",		LT::PRODREL },
+        { "WRITE-SYNTAX",			LT::WRSYNTAX },
+        { "CREATION-REQUIRES",		LT::CREATEREQ },
+        { "MANDATORY-GROUPS",		LT::MANDATORYGROUPS },
+        { "GROUP",					LT::GROUP },
+        { "CHOICE",					LT::CHOICE },
+        { "IMPLICIT",				LT::IMPLICIT },
+        { "ObjectSyntax",			LT::OBJSYNTAX },
+        { "SimpleSyntax",			LT::SIMPLESYNTAX },
+        { "ApplicationSyntax",		LT::APPSYNTAX },
+        { "ObjectName",				LT::OBJNAME },
+        { "NotificationName",		LT::NOTIFNAME },
+        { "VARIABLES",				LT::VARIABLES }
+};
+
+const std::vector<Parser::ModuleCompatibility> Parser::_modCompats = {
+
+        { "RFC1065-SMI", "RFC1155-SMI", "", false },
+        { "RFC1066-MIB", "RFC1156-MIB", "", false },
+        /*
+         * 'mib' -> 'mib-2'
+         */
+        { "RFC1156-MIB", "RFC1158-MIB", "", false },
+        /*
+         * 'snmpEnableAuthTraps' -> 'snmpEnableAuthenTraps'
+         */
+        { "RFC1158-MIB", "RFC1213-MIB", "", false },
+        /*
+         * 'nullOID' -> 'zeroDotZero'
+         */
+        { "RFC1155-SMI", "SNMPv2-SMI", "", false },
+        { "RFC1213-MIB", "SNMPv2-SMI", "mib-2", false },
+        { "RFC1213-MIB", "SNMPv2-MIB", "sys", true },
+        { "RFC1213-MIB", "IF-MIB", "if", true },
+        { "RFC1213-MIB", "IP-MIB", "ip", true },
+        { "RFC1213-MIB", "IP-MIB", "icmp", true },
+        { "RFC1213-MIB", "TCP-MIB", "tcp", true },
+        { "RFC1213-MIB", "UDP-MIB", "udp", true },
+        { "RFC1213-MIB", "SNMPv2-SMI", "transmission", false },
+        { "RFC1213-MIB", "SNMPv2-MIB", "snmp", true },
+        { "RFC1231-MIB", "TOKENRING-MIB", "", false },
+        { "RFC1271-MIB", "RMON-MIB", "", false },
+        { "RFC1286-MIB", "SOURCE-ROUTING-MIB", "dot1dSr", true },
+        { "RFC1286-MIB", "BRIDGE-MIB", "", false },
+        { "RFC1315-MIB", "FRAME-RELAY-DTE-MIB", "", false },
+        { "RFC1316-MIB", "CHARACTER-MIB", "", false },
+        { "RFC1406-MIB", "DS1-MIB", "", false },
+        { "RFC-1213", "RFC1213-MIB", "", false }
+};
+
+Parser::Parser(TreeModel* Tree) :
+    _tree(Tree),
     _line(0)
 {}
 
@@ -12,8 +143,7 @@ bool Parser::isLabelChar(char ch)
     if ((isalnum(ch)) || (ch == '-'))
         return true;
 
-    if (ch == '_' /*&& netsnmp_ds_get_boolean(NETSNMP_DS_LIBRARY_ID,
-                   NETSNMP_DS_LIB_MIB_PARSE_LABEL)*/)
+    if (ch == '_')
     {
         return true;
     }
@@ -23,44 +153,19 @@ bool Parser::isLabelChar(char ch)
 
 void Parser::parseImports(std::ifstream& file)
 {
-    //	register int    type;
-    //	char            token[MAXTOKEN];
-    //	char            modbuf[256];
-    //#define MAX_IMPORTS	256
-    //	struct module_import import_list[MAX_IMPORTS];
-    //	int             this_module;
-    //	struct module* mp;
-    //
-    //	int             import_count = 0;   /* Total number of imported descriptors */
-    //	int             i = 0, old_i;       /* index of first import from each module */
-
     Token token;
     ModuleImport import;
-    std::vector<ModuleImport> imports;
+    ModuleImportList imports;
 
     parseToken(file, token);
-    //type = get_token(fp, token, MAXTOKEN);
 
-    /*
-     * Parse the IMPORTS clause
-     */
-    while (token.type != LT::eSEMI && token.type != LT::eENDOFFILE)
+    while (token.type != LT::SEMI && token.type != LT::ENDOFFILE)
     {
-        if (token.type == LT::eLABEL)
+        if (token.type == LT::LABEL)
         {
-            //if (import_count == MAX_IMPORTS)
-            //{
-            //	print_error("Too many imported symbols", token, type);
-            //	do	
-            //	{
-            //		type = get_token(fp, token, MAXTOKEN);
-            //	} while (type != SEMI && type != ENDOFFILE);
-            //	return;
-            //}
             import.labels.push_back(token.lexem);
-            //import_list[import_count++].label = strdup(token);
         }
-        else if (token.type == LT::eFROM)
+        else if (token.type == LT::FROM)
         {
             parseToken(file, token);
 
@@ -70,30 +175,14 @@ void Parser::parseImports(std::ifstream& file)
                 continue;
             }
 
-            //type = get_token(fp, token, MAXTOKEN);
-            //if (import_count == i)
-            //{    /* All imports are handled internally */
-            //	type = get_token(fp, token, MAXTOKEN);
-            //	continue;
-            //}
-            //this_module = which_module(token);
             import.moduleName = token.lexem;
-
-
-            //for (old_i = i; i < import_count; ++i)
-            //	import_list[i].modid = this_module;
-
-            /*
-             * Recursively read any pre-requisite modules
-             */
-
             imports.push_back(std::move(import));
 
             auto status = readModuleInternal(token.lexem);
 
             if (status == LoadStatus::MODULE_NOT_FOUND)
             {
-                status = readImportReplacements(token.lexem, imports);
+                status = readModuleReplacements(token.lexem);
 
                 if (status == LoadStatus::MODULE_NOT_FOUND)
                 {
@@ -105,409 +194,199 @@ void Parser::parseImports(std::ifstream& file)
 
             if (_errinf.isError)
                 return;
-
-
-            //if (read_module_internal(token) == MODULE_NOT_FOUND)
-            //{
-            //	int found = 0;
-            //	for (; old_i < import_count; ++old_i)
-            //	{
-            //		found += read_import_replacements(token, &import_list[old_i]);
-            //	}
-            //	if (!found)
-            //		print_module_not_found(token);
-            //}
         }
-        //type = get_token(fp, token, MAXTOKEN);
         parseToken(file, token);
     }
 
-    /* Initialize modid in case the module name was missing. */
-    //for (; i < import_count; ++i) //hz
-    //	import_list[i].modid = -1;
-
-    /*
-     * Save the import information
-     *   in the global module table
-     */
-
-    auto& module = _tree->findModule(_moduleName);
+    auto& module = _tree ? _tree->findModule(_moduleName) : nullptr;
 
     if (module)
     {
         if (imports.empty())
             return;
 
-        //if (mp->imports && (mp->imports != root_imports)) //todo
-        //{
-        //	/*
-        //	 * this can happen if all modules are in one source file.
-        //	 */
-        //	for (i = 0; i < mp->no_imports; ++i)
-        //	{
-        //		DEBUGMSGTL(("parse-mibs",
-        //			"#### freeing Module %d '%s' %d\n",
-        //			mp->modid, mp->imports[i].label,
-        //			mp->imports[i].modid));
-        //		free((char*)mp->imports[i].label);
-        //	}
-        //	free((char*)mp->imports);
-        //}
-
         module->imports = std::move(imports);
 
         return;
-
     }
-
-    //for (mp = module_head; mp; mp = mp->next)
-    //	if (mp->modid == current_module)
-    //	{
-    //		if (import_count == 0)
-    //			return;
-    //		if (mp->imports && (mp->imports != root_imports))
-    //		{
-    //			/*
-    //			 * this can happen if all modules are in one source file.
-    //			 */
-    //			for (i = 0; i < mp->no_imports; ++i)
-    //			{
-    //				DEBUGMSGTL(("parse-mibs",
-    //					"#### freeing Module %d '%s' %d\n",
-    //					mp->modid, mp->imports[i].label,
-    //					mp->imports[i].modid));
-    //				free((char*)mp->imports[i].label);
-    //			}
-    //			free((char*)mp->imports);
-    //		}
-    //		mp->imports = (struct module_import*)
-    //			calloc(import_count, sizeof(struct module_import));
-    //		if (mp->imports == NULL)
-    //			return;
-    //		for (i = 0; i < import_count; ++i)
-    //		{
-    //			mp->imports[i].label = import_list[i].label;
-    //			mp->imports[i].modid = import_list[i].modid;
-    //			DEBUGMSGTL(("parse-mibs",
-    //				"#### adding Module %d '%s' %d\n", mp->modid,
-    //				mp->imports[i].label, mp->imports[i].modid));
-    //		}
-    //		mp->no_imports = import_count;
-    //		return;
-    //	}
 
     _errinf.isError = true;
     _errinf.description = "Module " + _moduleName + " not found.";
-
-    /*
-     * Shouldn't get this far
-     */
-     //print_module_not_found(module_name(current_module, modbuf)); 
-     //return;
-
 }
 
 NodeList Parser::parseObjectGroup(std::ifstream& file, const std::string& objName, LT what, Objgroup& objgroup)
 {
-    //int             type;
-    //char            token[MAXTOKEN];
-    //char            quoted_string_buffer[MAXQUOTESTR];
-    //struct node    *np;
     Token token;
     Node::Ptr np(new Node);
     np->label = objName;
 
-    //std::string obj;
-
-    //np = alloc_node(current_module);
-    //if (np == nullptr)
-    //	return EmptyResult;
-
     parseToken(file, token);
 
-    //type = get_token(fp, token, MAXTOKEN);
     if (token.type == what)
     {
         parseToken(file, token);
-        //type = get_token(fp, token, MAXTOKEN);
-        if (token.type != LT::eLEFTBRACKET)
+
+        if (token.type != LT::LEFTBRACKET)
         {
             _errinf.isError = true;
             _errinf.description = formError("Expected \"{\"", token.lexem);
             return EmptyResult;
-            //print_error("Expected \"{\"", token, type);
-            //free_node(np);
-            //return NULL;
-            //goto skip;
         }
 
         do
         {
-            //struct objgroup *o;
-            //type = get_token(fp, token, MAXTOKEN);
             parseToken(file, token);
-            if (token.type != LT::eLABEL)
+            if (token.type != LT::LABEL)
             {
                 _errinf.isError = true;
                 _errinf.description = formError("Bad identifier", token.lexem);
                 return EmptyResult;
-                //print_error("Bad identifier", token, type);
-                //free_node(np);
-                //return NULL;
-                //goto skip;
             }
-            //o = (struct objgroup *) malloc(sizeof(struct objgroup));
-            //if (!o)
-            //{
-            //	print_error("Resource failure", token, type);
-            //	free_node(np);
-            //	return NULL;
-            //	//goto skip;
-            //}
-            //obj = token.lexem;
-            //o->line = mibLine;
-            //o->name = strdup(token);
-            //o->next = *ol;
-            //*ol = o;
+
             objgroup.insert(token.lexem);
             parseToken(file, token);
-            //type = get_token(fp, token, MAXTOKEN);
-        } while (token.type == LT::eCOMMA);
 
-        if (token.type != LT::eRIGHTBRACKET)
+        } while (token.type == LT::COMMA);
+
+        if (token.type != LT::RIGHTBRACKET)
         {
             _errinf.isError = true;
             _errinf.description = formError("Expected \"}\"", token.lexem);
             return EmptyResult;
-            //print_error("Expected \"}\" after list", token, type);
-            //free_node(np);
-            //return NULL;
-            //goto skip;
         }
         parseToken(file, token);
-        //type = get_token(fp, token, type);
     }
 
-    if (token.type != LT::eSTATUS)
+    if (token.type != LT::STATUS)
     {
         _errinf.isError = true;
         _errinf.description = formError("Expected STATUS", token.lexem);
         return EmptyResult;
-        //print_error("Expected STATUS", token, type);
-        //free_node(np);
-        //return NULL;
-        //goto skip;
     }
+
     parseToken(file, token);
-    //type = get_token(fp, token, MAXTOKEN);
 
-
-    if (token.type != LT::eCURRENT && token.type != LT::eDEPRECATED && token.type != LT::eOBSOLETE)
+    if (token.type != LT::CURRENT && token.type != LT::DEPRECATED && token.type != LT::OBSOLETE)
     {
         _errinf.isError = true;
         _errinf.description = formError("Bad STATUS value", token.lexem);
         return EmptyResult;
-        //	//print_error("Bad STATUS value", token, type);
-        //	//free_node(np);
-        //	//return NULL;
-        //	//goto skip;
     }
 
     np->status = token.type;
 
     parseToken(file, token);
-    //type = get_token(fp, token, MAXTOKEN);
-    if (token.type != LT::eDESCRIPTION)
+
+    if (token.type != LT::DESCRIPTION)
     {
         _errinf.isError = true;
         _errinf.description = formError("Expected DESCRIPTION", token.lexem);
         return EmptyResult;
-        //print_error("Expected DESCRIPTION", token, type);
-        //free_node(np);
-        //return NULL;
-        //goto skip;
     }
     parseToken(file, token);
-    //type = get_token(fp, quoted_string_buffer, MAXQUOTESTR);
-    if (token.type != LT::eQUOTESTRING)
+
+    if (token.type != LT::QUOTESTRING)
     {
         _errinf.isError = true;
         _errinf.description = formError("Bad DESCRIPTION", token.lexem);
         return EmptyResult;
-        //print_error("Bad DESCRIPTION", quoted_string_buffer, type);
-        //free_node(np);
-        //return NULL;
     }
-    //if (netsnmp_ds_get_boolean(NETSNMP_DS_LIBRARY_ID,
-    //	NETSNMP_DS_LIB_SAVE_MIB_DESCRS))
-    //{
+
     np->description = token.lexem;
-    //}
+
     parseToken(file, token);
-    //type = get_token(fp, token, MAXTOKEN);
-    if (token.type == LT::eREFERENCE)
+
+    if (token.type == LT::REFERENCE)
     {
         parseToken(file, token);
-        //type = get_token(fp, quoted_string_buffer, MAXQUOTESTR);
-        if (token.type != LT::eQUOTESTRING)
+
+        if (token.type != LT::QUOTESTRING)
         {
             _errinf.isError = true;
             _errinf.description = formError("Bad REFERENCE", token.lexem);
             return EmptyResult;
-            //print_error("Bad REFERENCE", quoted_string_buffer, type);
-            //free_node(np);
-            //return NULL;
         }
         np->reference = token.lexem;
         parseToken(file, token);
-        //np->reference = strdup(quoted_string_buffer);
-        //type = get_token(fp, token, MAXTOKEN);
     }
 
-    if (token.type != LT::eEQUALS)
+    if (token.type != LT::EQUALS)
     {
         _errinf.isError = true;
         _errinf.description = formError("Expected \"::=\"", token.lexem);
         return EmptyResult;
-        //print_error("Expected \"::=\"", token, type);
-        //free_node(np);
-        //return NULL;
     }
 
     //skip:
-    while (token.type != LT::eEQUALS && token.type != LT::eENDOFFILE)
+    while (token.type != LT::EQUALS && token.type != LT::ENDOFFILE)
         parseToken(file, token);
-    //type = get_token(fp, token, MAXTOKEN);
 
     return mergeParsedObjectid(np, file);
-    //return merge_parse_objectid(np, fp, name);
 }
 
-
-/*
-* Parses an OBJECT TYPE macro.
-* Returns 0 on error.
-*/
 NodeList Parser::parseObjType(std::ifstream& file, const std::string& objName)
 {
-    //register int    type;
-    //char            token[MAXTOKEN];
-    //char            nexttoken[MAXTOKEN];
-    //char            quoted_string_buffer[MAXQUOTESTR];
-    //int             nexttype, tctype;
-    //register struct node *np;
-
     Token token;
     Node::Ptr np(new Node);
     np->label = objName;
 
     parseToken(file, token);
 
-    //type = get_token(fp, token, MAXTOKEN);
-    if (token.type != LT::eSYNTAX)
+    if (token.type != LT::SYNTAX)
     {
         _errinf.isError = true;
         _errinf.description = formError("Bad format for OBJECT-TYPE", token.lexem);
         return EmptyResult;
-        //print_error("Bad format for OBJECT-TYPE", token, type);
-        //return NULL;
     }
 
-    //np = alloc_node(current_module);
-    //if (np == NULL)
-    //	return (NULL);
-    //type = get_token(fp, token, MAXTOKEN);
     parseToken(file, token);
 
-    if (token.type == LT::eOBJECT)
+    if (token.type == LT::OBJECT)
     {
-        //type = get_token(fp, token, MAXTOKEN);
         parseToken(file, token);
 
-        if (token.type != LT::eIDENTIFIER)
+        if (token.type != LT::IDENTIFIER)
         {
             _errinf.isError = true;
             _errinf.description = formError("Expected IDENTIFIER", token.lexem);
             return EmptyResult;
-            /*print_error("Expected IDENTIFIER", token, type);
-            free_node(np);
-            return NULL;*/
         }
-        token.type = LT::eOBJID;
-        //type = OBJID;
+        token.type = LT::OBJID;
     }
 
-    if (token.type == LT::eLABEL)
+    if (token.type == LT::LABEL)
     {
-        int tc_index = _tclist.getTCIndex(token.lexem);
-
-        if (tc_index >= 0)
-        {
-            token.type = _tclist.getTC(tc_index).type;
-            //np->tc_index = tc_index; //hz
-        }
-        else
-        {
-            _undefNodes.emplace_back(np, token.lexem);
-        }
-        //int             tmp_index;
-        //tctype = get_tc(token, current_module, &tmp_index,
-        //	&np->enums, &np->ranges, &np->hint);
-        //if (tctype == LABEL &&
-        //	netsnmp_ds_get_int(NETSNMP_DS_LIBRARY_ID,
-        //		NETSNMP_DS_LIB_MIB_WARNINGS) > 1)
-        //{
-        //	print_error("Warning: No known translation for type", token,
-        //		type);
-        //}
-        //type = tctype;
-        //np->tc_index = tmp_index;       /* store TC for later reference */
+        _undefNodes.emplace_back(np, token.lexem);
     }
 
-    np->type = token.type;
+    np->syntax = token.type;
 
     LT lasttype = token.type;
 
     parseToken(file, token);
-    //nexttype = get_token(fp, nexttoken, MAXTOKEN);
 
     switch (lasttype)
     {
-    case LT::eSEQUENCE:
+    case LT::SEQUENCE:
 
-        //parseToken(file, token);
-        if (token.type == LT::eOF)
+        if (token.type == LT::OF)
         {
             parseToken(file, token);
             parseToken(file, token);
-            //nexttype = get_token(fp, nexttoken, MAXTOKEN);
-            //nexttype = get_token(fp, nexttoken, MAXTOKEN);
 
         }
         break;
-    case LT::eINTEGER:
-    case LT::eINTEGER32:
-    case LT::eUINTEGER32:
-    case LT::eUNSIGNED32:
-    case LT::eCOUNTER:
-    case LT::eGAUGE:
-    case LT::eBITSTRING:
-    case LT::eLABEL:
+    case LT::INTEGER:
+    case LT::INTEGER32:
+    case LT::UINTEGER32:
+    case LT::UNSIGNED32:
+    case LT::COUNTER:
+    case LT::GAUGE:
+    case LT::BITSTRING:
+    case LT::LABEL:
 
-        //parseToken(file, token);
-        if (token.type == LT::eLEFTBRACKET)
+        if (token.type == LT::LEFTBRACKET)
         {
-            /*
-            * if there is an enumeration list, parse it
-            */
-            //np->enums = parse_enumlist(fp, &np->enums);
-
-            /*if (!np->enums)
-            {
-                free_node(np);
-                return NULL;
-            }*/
-
             np->enums = parseEnums(file);
 
             if (np->enums.empty())
@@ -516,21 +395,9 @@ NodeList Parser::parseObjType(std::ifstream& file, const std::string& objName)
             }
 
             parseToken(file, token);
-            //nexttype = get_token(fp, nexttoken, MAXTOKEN);
         }
-        else if (token.type == LT::eLEFTPAREN)
+        else if (token.type == LT::LEFTPAREN)
         {
-            /*
-            * if there is a range list, parse it
-            */
-            /*np->ranges = parse_ranges(fp, &np->ranges);
-
-            if (!np->ranges)
-            {
-                free_node(np);
-                return NULL;
-            }*/
-
             np->ranges = parseRanges(file);
 
             if (np->ranges.empty())
@@ -539,38 +406,29 @@ NodeList Parser::parseObjType(std::ifstream& file, const std::string& objName)
             }
 
             parseToken(file, token);
-            //nexttype = get_token(fp, nexttoken, MAXTOKEN);
         }
         break;
-    case LT::eOCTETSTR:
-    case LT::eOPAQUE:
-
-        //parseToken(file, token);
-        /*
-        * parse any SIZE specification
-        */
-        if (token.type == LT::eLEFTPAREN)
+    case LT::OCTETSTR:
+    case LT::OPAQUE:
+        if (token.type == LT::LEFTPAREN)
         {
             parseToken(file, token);
-            //nexttype = get_token(fp, nexttoken, MAXTOKEN);
-            if (token.type == LT::eSIZE)
+
+            if (token.type == LT::SIZE)
             {
                 parseToken(file, token);
-                //nexttype = get_token(fp, nexttoken, MAXTOKEN);
-                if (token.type == LT::eLEFTPAREN)
+
+                if (token.type == LT::LEFTPAREN)
                 {
                     np->ranges = parseRanges(file);
 
-                    if (np->ranges.empty())
+                    if (_errinf.isError)
                         return EmptyResult;
 
-                    //np->ranges = parse_ranges(fp, &np->ranges); 
-                    //nexttype = get_token(fp, nexttoken, MAXTOKEN);      /* ) */
                     parseToken(file, token);
-                    if (token.type == LT::eRIGHTPAREN)
+                    if (token.type == LT::RIGHTPAREN)
                     {
                         parseToken(file, token);
-                        //nexttype = get_token(fp, nexttoken, MAXTOKEN);
                         break;
                     }
                 }
@@ -578,160 +436,122 @@ NodeList Parser::parseObjType(std::ifstream& file, const std::string& objName)
 
             _errinf.isError = true;
             _errinf.description = formError("Bad SIZE syntax", token.lexem);
-            //print_error("Bad SIZE syntax", token, type)r
-            //free_node(np);
             return EmptyResult;
         }
         break;
-    case LT::eOBJID:
-    case LT::eNETADDR:
-    case LT::eIPADDR:
-    case LT::eTIMETICKS:
-    case LT::eNULL:
-    case LT::eNSAPADDRESS:
-    case LT::eCOUNTER64:
+    case LT::OBJID:
+    case LT::NETADDR:
+    case LT::IPADDR:
+    case LT::TIMETICKS:
+    case LT::NUL:
+    case LT::NSAPADDRESS:
+    case LT::COUNTER64:
         break;
     default:
         _errinf.isError = true;
         _errinf.description = formError("Bad syntax", token.lexem);
         return EmptyResult;
-        //print_error("Bad syntax", token, type);
-        //free_node(np);
-        //return NULL;
     }
 
-    if (token.type == LT::eUNITS)
+    if (token.type == LT::UNITS)
     {
         parseToken(file, token);
-        //type = get_token(fp, quoted_string_buffer, MAXQUOTESTR);
-        if (token.type != LT::eQUOTESTRING)
+
+        if (token.type != LT::QUOTESTRING)
         {
-            //print_error("Bad UNITS", quoted_string_buffer, type);
-            //free_node(np);
-            //return NULL;
             _errinf.isError = true;
             _errinf.description = formError("Bad UNITS", token.lexem);
             return EmptyResult;
         }
         np->units = token.lexem;
         parseToken(file, token);
-        //nexttype = get_token(fp, nexttoken, MAXTOKEN);
     }
 
-    if (token.type != LT::eACCESS)
+    if (token.type != LT::ACCESS)
     {
         _errinf.isError = true;
         _errinf.description = formError("Should be ACCESS", token.lexem);
         return EmptyResult;
-        /*print_error("Should be ACCESS", nexttoken, nexttype);
-        free_node(np);
-        return NULL;*/
     }
+
     parseToken(file, token);
-    //type = get_token(fp, token, MAXTOKEN);
 
 
-    if (token.type != LT::eREADONLY && token.type != LT::eREADWRITE
-        && token.type != LT::eWRITEONLY && token.type != LT::eNOACCESS
-        && token.type != LT::eREADCREATE && token.type != LT::eACCNOTIFY)
+    if (token.type != LT::READONLY && token.type != LT::READWRITE
+        && token.type != LT::WRITEONLY && token.type != LT::NOACCESS
+        && token.type != LT::READCREATE && token.type != LT::ACCNOTIFY)
     {
         _errinf.isError = true;
         _errinf.description = formError("Bad ACCESS type", token.lexem);
         return EmptyResult;
-        /*print_error("Bad ACCESS type", token, type);
-        free_node(np);
-        return NULL;*/
     }
 
     np->access = token.type;
 
     parseToken(file, token);
-    //type = get_token(fp, token, MAXTOKEN);
-    if (token.type != LT::eSTATUS)
+
+    if (token.type != LT::STATUS)
     {
         _errinf.isError = true;
         _errinf.description = formError("Should be STATUS", token.lexem);
         return EmptyResult;
-        //print_error("Should be STATUS", token, type);
-        //free_node(np);
-        //return NULL;
     }
+
     parseToken(file, token);
-    //type = get_token(fp, token, MAXTOKEN);
-    if (token.type != LT::eMANDATORY && token.type != LT::eCURRENT
-        && token.type != LT::eOPTIONAL && token.type != LT::eOBSOLETE
-        && token.type != LT::eDEPRECATED)
+
+    if (token.type != LT::MANDATORY && token.type != LT::CURRENT
+        && token.type != LT::OPTIONAL && token.type != LT::OBSOLETE
+        && token.type != LT::DEPRECATED)
     {
         _errinf.isError = true;
         _errinf.description = formError("Bad STATUS", token.lexem);
         return EmptyResult;
-        /*print_error("Bad STATUS", token, type);
-        free_node(np);
-        return NULL;*/
     }
+
     np->status = token.type;
     /*
     * Optional parts of the OBJECT-TYPE macro
     */
     parseToken(file, token);
-    //type = get_token(fp, token, MAXTOKEN);
-    while (token.type != LT::eEQUALS && token.type != LT::eENDOFFILE)
+
+    while (token.type != LT::EQUALS && token.type != LT::ENDOFFILE)
     {
         switch (token.type)
         {
-        case LT::eDESCRIPTION:
-            //type = get_token(fp, quoted_string_buffer, MAXQUOTESTR);
+        case LT::DESCRIPTION:
+
             parseToken(file, token);
 
-            if (token.type != LT::eQUOTESTRING)
+            if (token.type != LT::QUOTESTRING)
             {
                 _errinf.isError = true;
                 _errinf.description = formError("Bad DESCRIPTION", token.lexem);
                 return EmptyResult;
-                //print_error("Bad DESCRIPTION", quoted_string_buffer, type);
-                //free_node(np);
-                //return NULL;
             }
-            /*if (netsnmp_ds_get_boolean(NETSNMP_DS_LIBRARY_ID,
-                NETSNMP_DS_LIB_SAVE_MIB_DESCRS))
-            {*/
+
             np->description = token.lexem;
-            //}
             break;
 
-        case LT::eREFERENCE:
+        case LT::REFERENCE:
+
             parseToken(file, token);
-            //type = get_token(fp, quoted_string_buffer, MAXQUOTESTR);
-            if (token.type != LT::eQUOTESTRING)
+            if (token.type != LT::QUOTESTRING)
             {
                 _errinf.isError = true;
                 _errinf.description = formError("Bad REFERENCE", token.lexem);
                 return EmptyResult;
-                //print_error("Bad REFERENCE", quoted_string_buffer, type);
-                //free_node(np);
-                //return NULL;
             }
             np->reference = token.lexem;
             break;
-        case LT::eINDEX:
+        case LT::INDEX:
 
             if (!np->augments.empty())
             {
                 _errinf.isError = true;
                 _errinf.description = formError("Cannot have both INDEX and AUGMENTS", token.lexem);
                 return EmptyResult;
-                //print_error("Cannot have both INDEX and AUGMENTS", token,
-                //	type);
-                //free_node(np);
-                //return NULL;
             }
-            //np->indexes = getIndexes(fp, &np->indexes); 
-            //if (np->indexes == NULL)
-            //{
-            //	print_error("Bad INDEX list", token, type);
-            //	free_node(np);
-            //	return NULL;
-            //}
+
             np->indexes = parseIndexes(file);
 
             if (np->indexes.empty())
@@ -742,112 +562,79 @@ NodeList Parser::parseObjType(std::ifstream& file, const std::string& objName)
             }
 
             break;
-        case LT::eAUGMENTS:
-            //if (np->indexes)
+        case LT::AUGMENTS:
+
             if (!np->indexes.empty())
             {
                 _errinf.isError = true;
                 _errinf.description = formError("Cannot have both INDEX and AUGMENTS", token.lexem);
                 return EmptyResult;
-                /*print_error("Cannot have both INDEX and AUGMENTS", token,
-                    type);
-                free_node(np);
-                return NULL;*/
             }
-            //np->indexes = getIndexes(fp, &np->indexes);
+
             np->indexes = parseIndexes(file);
-            //if (np->indexes == NULL)
+
             if (np->indexes.empty())
             {
                 _errinf.isError = true;
                 _errinf.description = formError("Bad AUGMENTS list", token.lexem);
                 return EmptyResult;
-                /*print_error("Bad AUGMENTS list", token, type);
-                free_node(np);
-                return NULL;*/
             }
 
             np->augments = np->indexes.front().ilabel;
-
-            //np->augments = strdup(np->indexes->ilabel);
-            //free_indexes(&np->indexes);
             break;
-        case LT::eDEFVAL:
-            /*
-            * Mark's defVal section
-            */
-            //type = get_token(fp, quoted_string_buffer, MAXTOKEN);
+
+        case LT::DEFVAL:
+
             parseToken(file, token);
-            if (token.type != LT::eLEFTBRACKET)
+            if (token.type != LT::LEFTBRACKET)
             {
                 _errinf.isError = true;
                 _errinf.description = formError("Bad DEFAULTVALUE", token.lexem);
                 return EmptyResult;
-                /*print_error("Bad DEFAULTVALUE", quoted_string_buffer,
-                    type);
-                free_node(np);
-                return NULL;*/
             }
 
             {
-                int             level = 1;
+                int level = 1;
                 std::string defbuf;
 
                 while (true)
                 {
                     parseToken(file, token);
-                    //type = get_token(fp, quoted_string_buffer, MAXTOKEN);
-                    if ((token.type == LT::eRIGHTBRACKET && --level == 0)
-                        || token.type == LT::eENDOFFILE)
-                        break;
-                    else if (token.type == LT::eLEFTBRACKET)
-                        level++;
-                    if (token.type == LT::eQUOTESTRING)
-                        defbuf += "\\\"";
-                    //strlcat(defbuf, "\\\"", sizeof(defbuf));
-                    defbuf += token.lexem;
-                    //strlcat(defbuf, quoted_string_buffer, sizeof(defbuf));
-                    if (token.type == LT::eQUOTESTRING)
-                        defbuf += "\\\"";
-                    //strlcat(defbuf, "\\\"", sizeof(defbuf));
-                    defbuf += " ";
-                    //strlcat(defbuf, " ", sizeof(defbuf));
-                }
 
-                if (token.type != LT::eRIGHTBRACKET)
+                    if ((token.type == LT::RIGHTBRACKET && --level == 0)
+                        || token.type == LT::ENDOFFILE)
+                        break;
+                    else if (token.type == LT::LEFTBRACKET)
+                        level++;
+
+                    defbuf += token.lexem + ' ';
+
+                }
+                defbuf.pop_back();
+
+                if (token.type != LT::RIGHTBRACKET)
                 {
                     _errinf.isError = true;
                     _errinf.description = formError("Bad DEFAULTVALUE", token.lexem);
                     return EmptyResult;
-                    /*print_error("Bad DEFAULTVALUE", quoted_string_buffer,
-                        type);
-                    free_node(np);
-                    return NULL;*/
                 }
 
-                //defbuf[strlen(defbuf) - 1] = 0;
                 np->defaultValue = defbuf;
             }
 
             break;
 
-        case LT::eNUM_ENTRIES:
+        case LT::NUMENTRIES:
 
             tossObjectIdentifier(file, token);
 
-            if (token.type != LT::eOBJID)
+            if (token.type != LT::OBJID)
             {
                 _errinf.isError = true;
                 _errinf.description = formError("Bad Object Identifier", token.lexem);
                 return EmptyResult;
             }
 
-            /*if (tossObjectIdentifier(fp) != OBJID)
-            {
-                print_error("Bad Object Identifier", token, type);
-                free_node(np);
-                return NULL;
-            }*/
             break;
 
         default:
@@ -855,239 +642,178 @@ NodeList Parser::parseObjType(std::ifstream& file, const std::string& objName)
             _errinf.isError = true;
             _errinf.description = formError("Bad format of optional clauses", token.lexem);
             return EmptyResult;
-            /*print_error("Bad format of optional clauses", token, type);
-            free_node(np);
-            return NULL;*/
 
         }
         parseToken(file, token);
-        //type = get_token(fp, token, MAXTOKEN);
     }
-    if (token.type != LT::eEQUALS)
+    if (token.type != LT::EQUALS)
     {
         _errinf.isError = true;
         _errinf.description = formError("Bad format", token.lexem);
         return EmptyResult;
-        //print_error("Bad format", token, type);
-        //free_node(np);
-        //return NULL;
     }
     return mergeParsedObjectid(np, file);
-    //return merge_parse_objectid(np, fp, name);
 }
 
-/*
-* Parses a NOTIFICATION-TYPE macro.
-* Returns 0 on error.
-*/
 NodeList Parser::parseNotifType(std::ifstream& file, const std::string& objName)
 {
-    //register int    type;
-    //char            token[MAXTOKEN];
-    //char            quoted_string_buffer[MAXQUOTESTR];
-    //register struct node *np;
-
     Node::Ptr np(new Node);
     np->label = objName;
 
     Token token;
 
-    //np = alloc_node(current_module);
-    //if (np == NULL)
-    //	return (NULL);
-    //type = get_token(fp, token, MAXTOKEN);
     parseToken(file, token);
 
-    while (token.type != LT::eEQUALS && token.type != LT::eENDOFFILE) //mb
+    while (token.type != LT::EQUALS && token.type != LT::ENDOFFILE) //mb
     {
         switch (token.type)
         {
-        case LT::eSTATUS:
+        case LT::STATUS:
 
             parseToken(file, token);
-            //type = get_token(fp, token, MAXTOKEN);
 
 
-            if (token.type != LT::eCURRENT && token.type != LT::eDEPRECATED && token.type != LT::eOBSOLETE)
+            if (token.type != LT::CURRENT && token.type != LT::DEPRECATED && token.type != LT::OBSOLETE)
             {
                 _errinf.isError = true;
                 _errinf.description = formError("Bad STATUS value", token.lexem);
                 return EmptyResult;
-                //	//print_error("Bad STATUS value", token, type);
-                //	//free_node(np);
-                //	//return NULL;
-                //	//goto skip;
             }
 
             np->status = token.type;
 
             break;
-        case LT::eDESCRIPTION:
-            //type = get_token(fp, quoted_string_buffer, MAXQUOTESTR);
+        case LT::DESCRIPTION:
+
             parseToken(file, token);
 
-            if (token.type != LT::eQUOTESTRING)
+            if (token.type != LT::QUOTESTRING)
             {
                 _errinf.isError = true;
                 _errinf.description = formError("Bad DESCRIPTION", token.lexem);
                 return EmptyResult;
-                //print_error("Bad DESCRIPTION", quoted_string_buffer, type);
-                //free_node(np);
-                //return NULL;
             }
-            //if (netsnmp_ds_get_boolean(NETSNMP_DS_LIBRARY_ID,
-            //	NETSNMP_DS_LIB_SAVE_MIB_DESCRS))
-            //{
-            np->description = token.lexem;//strdup(quoted_string_buffer);
-            //}
+
+            np->description = token.lexem;
+
             break;
-        case LT::eREFERENCE:
-            //type = get_token(fp, quoted_string_buffer, MAXQUOTESTR);
+        case LT::REFERENCE:
             parseToken(file, token);
-            if (token.type != LT::eQUOTESTRING)
+            if (token.type != LT::QUOTESTRING)
             {
                 _errinf.isError = true;
                 _errinf.description = formError("Bad REFERENCE", token.lexem);
                 return EmptyResult;
-                //print_error("Bad REFERENCE", quoted_string_buffer, type);
-                //free_node(np);
-                //return NULL;
             }
-            np->reference = token.lexem;//strdup(quoted_string_buffer);
+
+            np->reference = token.lexem;
             break;
-        case LT::eOBJECTS:
-            //np->varbinds = getVarbinds(fp, &np->varbinds);
+        case LT::OBJECTS:
+
             np->varbinds = parseVarbinds(file);
 
-            //if (!np->varbinds)
             if (np->varbinds.empty())
             {
-                _errinf.isError = true;
-                _errinf.description = formError("Bad OBJECTS list", token.lexem);
+                if (_errinf.isError == false)
+                {
+                    _errinf.isError = true;
+                    _errinf.description = formError("Bad OBJECTS list", token.lexem);
+                }
                 return EmptyResult;
-                //print_error("Bad OBJECTS list", token, type);
-                //free_node(np);
-                //return NULL;
             }
             break;
         default:
-            /*
-            * NOTHING
-            */
-            break;
+
+            _errinf.isError = true;
+            _errinf.description = formError("Unexpected", token.lexem);
+            return EmptyResult;
         }
 
         parseToken(file, token);
-        //type = get_token(fp, token, MAXTOKEN);
     }
     return mergeParsedObjectid(np, file);
-    //return merge_parse_objectid(np, fp, name);
 }
 
 
 NodeList Parser::parseCompliance(std::ifstream& file, const std::string& objName)
 {
-    //int             type;
-    //char            token[MAXTOKEN];
-    //char            quoted_string_buffer[MAXQUOTESTR];
-    //struct node    *np;
+
     Node::Ptr np(new Node);
     np->label = objName;
     Token token;
     std::string moduleName;
     int debug = 0;
 
-    //np = alloc_node(current_module);
-    //if (np == NULL)
-    //	return (NULL);
-    //type = get_token(fp, token, MAXTOKEN);
     parseToken(file, token);
 
-    if (token.type != LT::eSTATUS)
+    if (token.type != LT::STATUS)
     {
         _errinf.isError = true;
         _errinf.description = formError("Expected STATUS", token.lexem);
         return EmptyResult;
-        //print_error("Expected STATUS", token, type);
-        //goto skip;
+
     }
 
-    //type = get_token(fp, token, MAXTOKEN);
     parseToken(file, token);
 
-    if (token.type != LT::eCURRENT && token.type != LT::eDEPRECATED && token.type != LT::eOBSOLETE)
+    if (token.type != LT::CURRENT && token.type != LT::DEPRECATED && token.type != LT::OBSOLETE)
     {
         _errinf.isError = true;
         _errinf.description = formError("Bad STATUS", token.lexem);
         return EmptyResult;
-        //print_error("Bad STATUS", token, type);
-        //goto skip;
     }
     np->status = token.type;
 
     parseToken(file, token);
-    //type = get_token(fp, token, MAXTOKEN);
-    if (token.type != LT::eDESCRIPTION)
+
+    if (token.type != LT::DESCRIPTION)
     {
         _errinf.isError = true;
         _errinf.description = formError("Expected DESCRIPTION", token.lexem);
         return EmptyResult;
-        //print_error("Expected DESCRIPTION", token, type);
-        //goto skip;
     }
 
     parseToken(file, token);
-    //type = get_token(fp, quoted_string_buffer, MAXQUOTESTR);
-    if (token.type != LT::eQUOTESTRING)
+
+    if (token.type != LT::QUOTESTRING)
     {
         _errinf.isError = true;
         _errinf.description = formError("Bad DESCRIPTION", token.lexem);
         return EmptyResult;
-        //print_error("Bad DESCRIPTION", quoted_string_buffer, type);
-        //goto skip;
     }
-    //if (netsnmp_ds_get_boolean(NETSNMP_DS_LIBRARY_ID,
-    //	NETSNMP_DS_LIB_SAVE_MIB_DESCRS))
-    np->description = token.lexem; //strdup(quoted_string_buffer);
-    //type = get_token(fp, token, MAXTOKEN);
+    np->description = token.lexem;
+
     parseToken(file, token);
 
-    if (token.type == LT::eREFERENCE)
+    if (token.type == LT::REFERENCE)
     {
-        //type = get_token(fp, quoted_string_buffer, MAXTOKEN);
         parseToken(file, token);
 
-        if (token.type != LT::eQUOTESTRING)
+        if (token.type != LT::QUOTESTRING)
         {
             _errinf.isError = true;
             _errinf.description = formError("Bad REFERENCE", token.lexem);
             return EmptyResult;
-            //print_error("Bad REFERENCE", quoted_string_buffer, type);
-            //goto skip;
         }
-        np->reference = token.lexem; //strdup(quoted_string_buffer);
-        //type = get_token(fp, token, MAXTOKEN);
+
+        np->reference = token.lexem;
         parseToken(file, token);
     }
 
-    if (token.type != LT::eMODULE)
+    if (token.type != LT::MODULE)
     {
         _errinf.isError = true;
         _errinf.description = formError("Expected MODULE", token.lexem);
         return EmptyResult;
-        //print_error("Expected MODULE", token, type);
-        //goto skip;
     }
 
-    while (token.type == LT::eMODULE)
+    while (token.type == LT::MODULE)
     {
         std::string module;
-        //int             modid = -1;
-        //char            modname[MAXTOKEN];
-        //type = get_token(fp, token, MAXTOKEN);
+
         parseToken(file, token);
 
-        if (token.type == LT::eLABEL && token.lexem != _moduleName)//strcmp(token, module_name(current_module, modname)))
+        if (token.type == LT::LABEL && token.lexem != _moduleName)
         {
             moduleName = token.lexem;
 
@@ -1100,49 +826,29 @@ NodeList Parser::parseCompliance(std::ifstream& file, const std::string& objName
                 return EmptyResult;
             }
 
-            //module = token.lexem;
-
-            //modid = read_module_internal(token);
-            //
-            //if (modid != MODULE_LOADED_OK && modid != MODULE_ALREADY_LOADED)
-            //{
-            //	print_error("Unknown module", token, type);
-            //	goto skip;
-            //}
-            //
-            //modid = which_module(token);
             parseToken(file, token);
-            //type = get_token(fp, token, MAXTOKEN);
         }
 
-        if (token.type == LT::eMANDATORYGROUPS)
+        if (token.type == LT::MANDATORYGROUPS)
         {
-            //type = get_token(fp, token, MAXTOKEN);
             parseToken(file, token);
 
-            if (token.type != LT::eLEFTBRACKET)
+            if (token.type != LT::LEFTBRACKET)
             {
                 _errinf.isError = true;
                 _errinf.description = formError("Expected \"{\"", token.lexem);
                 return EmptyResult;
-                //print_error("Expected \"{\"", token, type);
-                //goto skip;
             }
             do
             {
                 parseToken(file, token);
-                //type = get_token(fp, token, MAXTOKEN);
-                if (token.type != LT::eLABEL)
+
+                if (token.type != LT::LABEL)
                 {
                     _errinf.isError = true;
                     _errinf.description = formError("Bad group name", token.lexem);
                     return EmptyResult;
-                    //print_error("Bad group name", token, type);
-                    //goto skip;
                 }
-
-                if (moduleName == "SNMP-TARGET-MIB")
-                    debug = 1;
 
                 if (!complianceLookup(token.lexem, moduleName))
                 {
@@ -1152,40 +858,31 @@ NodeList Parser::parseCompliance(std::ifstream& file, const std::string& objName
                     return EmptyResult;
                 }
 
-                //if (!compliance_lookup(token, modid))
-                //	print_error("Unknown group", token, type);
-                //type = get_token(fp, token, MAXTOKEN);
                 parseToken(file, token);
 
-            } while (token.type == LT::eCOMMA);
+            } while (token.type == LT::COMMA);
 
-            if (token.type != LT::eRIGHTBRACKET)
+            if (token.type != LT::RIGHTBRACKET)
             {
                 _errinf.isError = true;
                 _errinf.description = formError("Expected \"}\"", token.lexem);
                 return EmptyResult;
-                //print_error("Expected \"}\"", token, type);
-                //goto skip;
             }
 
             parseToken(file, token);
-            //type = get_token(fp, token, MAXTOKEN);
         }
 
-        while (token.type == LT::eGROUP || token.type == LT::eOBJECT)
+        while (token.type == LT::GROUP || token.type == LT::OBJECT)
         {
-            if (token.type == LT::eGROUP)
+            if (token.type == LT::GROUP)
             {
                 parseToken(file, token);
-                //type = get_token(fp, token, MAXTOKEN);
 
-                if (token.type != LT::eLABEL)
+                if (token.type != LT::LABEL)
                 {
                     _errinf.isError = true;
                     _errinf.description = formError("Bad group name", token.lexem);
                     return EmptyResult;
-                    //print_error("Bad group name", token, type);
-                    //goto skip;
                 }
 
                 if (!complianceLookup(token.lexem, moduleName))
@@ -1195,23 +892,18 @@ NodeList Parser::parseCompliance(std::ifstream& file, const std::string& objName
                         + "\nTry to load " + moduleName + " first";
                     return EmptyResult;
                 }
-                //if (!compliance_lookup(token, modid))
-                //	print_error("Unknown group", token, type);
-                parseToken(file, token);
 
-                //type = get_token(fp, token, MAXTOKEN);
+                parseToken(file, token);
             }
             else
             {
                 parseToken(file, token);
-                //type = get_token(fp, token, MAXTOKEN);
-                if (token.type != LT::eLABEL)
+
+                if (token.type != LT::LABEL)
                 {
                     _errinf.isError = true;
                     _errinf.description = formError("Bad object name", token.lexem);
                     return EmptyResult;
-                    //print_error("Bad object name", token, type);
-                    //goto skip;
                 }
 
                 if (!complianceLookup(token.lexem, moduleName))
@@ -1221,388 +913,291 @@ NodeList Parser::parseCompliance(std::ifstream& file, const std::string& objName
                         + "\nTry to load " + moduleName + " first";
                     return EmptyResult;
                 }
-                //if (!compliance_lookup(token, modid))
-                //	print_error("Unknown group", token, type);
+
                 parseToken(file, token);
-                //type = get_token(fp, token, MAXTOKEN);
-                if (token.type == LT::eSYNTAX)
-                    eatSyntax(file, token);
-                //type = eat_syntax(fp, token, MAXTOKEN);
-                if (token.type == LT::eWRSYNTAX)
-                    eatSyntax(file, token);
-                //type = eat_syntax(fp, token, MAXTOKEN);
-                if (token.type == LT::eMINACCESS)
+
+                if (token.type == LT::SYNTAX)
                 {
-                    //type = get_token(fp, token, MAXTOKEN);
+                    eatSyntax(file, token);
+
+                    if (_errinf.isError)
+                        return EmptyResult;
+                }
+
+                if (token.type == LT::WRSYNTAX)
+                {
+                    eatSyntax(file, token);
+
+                    if (_errinf.isError)
+                        return EmptyResult;
+                }
+
+                if (token.type == LT::MINACCESS)
+                {
+
                     parseToken(file, token);
 
-                    if (token.type != LT::eNOACCESS && token.type != LT::eACCNOTIFY
-                        && token.type != LT::eREADONLY && token.type != LT::eWRITEONLY
-                        && token.type != LT::eREADCREATE && token.type != LT::eREADWRITE)
+                    if (token.type != LT::NOACCESS && token.type != LT::ACCNOTIFY
+                        && token.type != LT::READONLY && token.type != LT::WRITEONLY
+                        && token.type != LT::READCREATE && token.type != LT::READWRITE)
                     {
                         _errinf.isError = true;
                         _errinf.description = formError("Bad MIN-ACCESS spec", token.lexem);
                         return EmptyResult;
-                        //print_error("Bad MIN-ACCESS spec", token, type);
-                        //goto skip;
                     }
 
-                    np->access = token.type;
-
                     parseToken(file, token);
-                    //type = get_token(fp, token, MAXTOKEN);
                 }
             }
 
-            if (token.type != LT::eDESCRIPTION)
+            if (token.type != LT::DESCRIPTION)
             {
                 _errinf.isError = true;
                 _errinf.description = formError("Expected DESCRIPTION", token.lexem);
                 return EmptyResult;
-                //print_error("Expected DESCRIPTION", token, type);
-                //goto skip;
             }
+
             parseToken(file, token);
-            //type = get_token(fp, token, MAXTOKEN);
-            if (token.type != LT::eQUOTESTRING)
+            if (token.type != LT::QUOTESTRING)
             {
                 _errinf.isError = true;
                 _errinf.description = formError("Bad DESCRIPTION", token.lexem);
                 return EmptyResult;
-                //print_error("Bad DESCRIPTION", token, type);
-                //goto skip;
             }
 
             parseToken(file, token);
-            //type = get_token(fp, token, MAXTOKEN);
         }
 
         moduleName.clear();
     }
-    //skip:
-    //	while (type != EQUALS && type != ENDOFFILE)
-    //		type = get_token(fp, quoted_string_buffer, MAXQUOTESTR);
 
     return mergeParsedObjectid(np, file);
-    //return merge_parse_objectid(np, fp, name);
 }
 
 NodeList Parser::parseModuleIdentity(std::ifstream& file, const std::string& objName)
 {
-    //register int    type;
-    //char            token[MAXTOKEN];
-    //char            quoted_string_buffer[MAXQUOTESTR];
-    //register struct node *np;
-
     Node::Ptr np(new Node);
     np->label = objName;
 
     Token token;
 
-    //np = alloc_node(current_module);
-    //if (np == NULL)
-    //	return (NULL);
-    //type = get_token(fp, token, MAXTOKEN);
-
     parseToken(file, token);
 
-    if (token.type != LT::eLASTUPDATED)
+    if (token.type != LT::LASTUPDATED)
     {
         _errinf.isError = true;
         _errinf.description = formError("Expected LAST-UPDATED", token.lexem);
         return EmptyResult;
-        //print_error("Expected LAST-UPDATED", token, type);
-        //goto skip;
     }
 
     parseToken(file, token);
-    //type = get_token(fp, token, MAXTOKEN);
-    if (token.type != LT::eQUOTESTRING)
+    if (token.type != LT::QUOTESTRING)
     {
         _errinf.isError = true;
         _errinf.description = formError("Need STRING for LAST-UPDATED", token.lexem);
         return EmptyResult;
-        //print_error("Need STRING for LAST-UPDATED", token, type);
-        //goto skip;
     }
-
-    //check_utc(token);
-
-    token.lexem.erase(token.lexem.begin()); //hz
-    token.lexem.pop_back();
 
     if (!checkUTC(token.lexem))
         return EmptyResult;
 
     parseToken(file, token);
 
-    //type = get_token(fp, token, MAXTOKEN);
-    if (token.type != LT::eORGANIZATION)
+    if (token.type != LT::ORGANIZATION)
     {
         _errinf.isError = true;
         _errinf.description = formError("Expected ORGANIZATION", token.lexem);
         return EmptyResult;
-        //print_error("Expected ORGANIZATION", token, type);
-        //goto skip;
     }
 
     parseToken(file, token);
-    //type = get_token(fp, token, MAXTOKEN);
-    if (token.type != LT::eQUOTESTRING)
+
+    if (token.type != LT::QUOTESTRING)
     {
         _errinf.isError = true;
         _errinf.description = formError("Bad ORGANIZATION", token.lexem);
         return EmptyResult;
-        //print_error("Bad ORGANIZATION", token, type);
-        //goto skip;
     }
 
     parseToken(file, token);
-    //type = get_token(fp, token, MAXTOKEN);
 
-    if (token.type != LT::eCONTACTINFO)
+    if (token.type != LT::CONTACTINFO)
     {
         _errinf.isError = true;
         _errinf.description = formError("Expected CONTACT-INFO", token.lexem);
         return EmptyResult;
-        //print_error("Expected CONTACT-INFO", token, type);
-        //goto skip;
     }
-    //type = get_token(fp, quoted_string_buffer, MAXQUOTESTR);
+
     parseToken(file, token);
 
-    if (token.type != LT::eQUOTESTRING)
+    if (token.type != LT::QUOTESTRING)
     {
         _errinf.isError = true;
         _errinf.description = formError("Bad CONTACT-INFO", token.lexem);
         return EmptyResult;
-        //print_error("Bad CONTACT-INFO", quoted_string_buffer, type);
-        //goto skip;
     }
 
     parseToken(file, token);
-    //type = get_token(fp, token, MAXTOKEN);
-    if (token.type != LT::eDESCRIPTION)
+
+    if (token.type != LT::DESCRIPTION)
     {
         _errinf.isError = true;
         _errinf.description = formError("Expected DESCRIPTION", token.lexem);
         return EmptyResult;
-        //print_error("Expected DESCRIPTION", token, type);
-        //goto skip;
     }
 
     parseToken(file, token);
-    //type = get_token(fp, quoted_string_buffer, MAXQUOTESTR);
-    if (token.type != LT::eQUOTESTRING)
+
+    if (token.type != LT::QUOTESTRING)
     {
         _errinf.isError = true;
         _errinf.description = formError("Bad DESCRIPTION", token.lexem);
         return EmptyResult;
-        //print_error("Bad DESCRIPTION", quoted_string_buffer, type);
-        //goto skip;
     }
-    //if (netsnmp_ds_get_boolean(NETSNMP_DS_LIBRARY_ID,
-    //	NETSNMP_DS_LIB_SAVE_MIB_DESCRS))
-    //{
-    np->description = token.lexem;//strdup(quoted_string_buffer);
-    //}
+
+    np->description = token.lexem;
+
     parseToken(file, token);
-    //type = get_token(fp, token, MAXTOKEN);
-    while (token.type == LT::eREVISION)
+
+    while (token.type == LT::REVISION)
     {
-        //type = get_token(fp, token, MAXTOKEN);
         parseToken(file, token);
 
-        if (token.type != LT::eQUOTESTRING)
+        if (token.type != LT::QUOTESTRING)
         {
             _errinf.isError = true;
             _errinf.description = formError("Bad REVISION", token.lexem);
             return EmptyResult;
-            //print_error("Bad REVISION", token, type);
-            //goto skip;
         }
-        //check_utc(token); 
-
-        token.lexem.erase(token.lexem.begin()); //hz
-        token.lexem.pop_back();
 
         if (!checkUTC(token.lexem))
             return EmptyResult;
 
         parseToken(file, token);
-        //type = get_token(fp, token, MAXTOKEN);
-        if (token.type != LT::eDESCRIPTION)
+
+        if (token.type != LT::DESCRIPTION)
         {
             _errinf.isError = true;
             _errinf.description = formError("Expected DESCRIPTION", token.lexem);
             return EmptyResult;
-            //print_error("Expected DESCRIPTION", token, type);
-            //goto skip;
         }
-        //type = get_token(fp, quoted_string_buffer, MAXQUOTESTR);
+
         parseToken(file, token);
 
-        if (token.type != LT::eQUOTESTRING)
+        if (token.type != LT::QUOTESTRING)
         {
             _errinf.isError = true;
             _errinf.description = formError("Bad DESCRIPTION", token.lexem);
             return EmptyResult;
-            //print_error("Bad DESCRIPTION", quoted_string_buffer, type);
-            //goto skip;
         }
 
         parseToken(file, token);
-        //type = get_token(fp, token, MAXTOKEN);
     }
 
-    if (token.type != LT::eEQUALS)
+    if (token.type != LT::EQUALS)
     {
         _errinf.isError = true;
         _errinf.description = formError("Expected \"::=\"", token.lexem);
         return EmptyResult;
     }
-    //print_error("Expected \"::=\"", token, type);
 
     return mergeParsedObjectid(np, file);
-    //skip:
-    //	while (type != EQUALS && type != ENDOFFILE)
-    //	{
-    //		type = get_token(fp, quoted_string_buffer, MAXQUOTESTR);
-    //	}
-    //	return merge_parse_objectid(np, fp, name);
 }
 
-/*
-* Parses a capabilities macro
-* Returns 0 on error.
-*/
 NodeList Parser::parseCapabilities(std::ifstream& file, const std::string& objName)
 {
-    //int             type;
-    //char            token[MAXTOKEN];
-    //char            quoted_string_buffer[MAXQUOTESTR];
-    //struct node    *np;
     Node::Ptr np(new Node);
     np->label = objName;
 
     Token token;
 
-
-    //np = alloc_node(current_module);
-    //if (np == NULL)
-    //	return (NULL);
-    //type = get_token(fp, token, MAXTOKEN);
     parseToken(file, token);
 
-    if (token.type != LT::ePRODREL)
+    if (token.type != LT::PRODREL)
     {
         _errinf.isError = true;
         _errinf.description = formError("Expected PRODUCT-RELEASE", token.lexem);
         return EmptyResult;
-        //print_error("Expected PRODUCT-RELEASE", token, type);
-        //goto skip;
     }
-    //type = get_token(fp, token, MAXTOKEN);
+
     parseToken(file, token);
 
-    if (token.type != LT::eQUOTESTRING)
+    if (token.type != LT::QUOTESTRING)
     {
         _errinf.isError = true;
         _errinf.description = formError("Expected STRING after PRODUCT-RELEASE", token.lexem);
         return EmptyResult;
-        //print_error("Expected STRING after PRODUCT-RELEASE", token, type);
-        //goto skip;
     }
-    //type = get_token(fp, token, MAXTOKEN);
+
     parseToken(file, token);
 
-    if (token.type != LT::eSTATUS)
+    if (token.type != LT::STATUS)
     {
         _errinf.isError = true;
         _errinf.description = formError("Expected STATUS", token.lexem);
         return EmptyResult;
-        //print_error("Expected STATUS", token, type);
-        //goto skip;
     }
-    //type = get_token(fp, token, MAXTOKEN);
+
     parseToken(file, token);
 
-    if (token.type != LT::eCURRENT && token.type != LT::eOBSOLETE)
+    if (token.type != LT::CURRENT && token.type != LT::OBSOLETE)
     {
         _errinf.isError = true;
         _errinf.description = formError("STATUS should be current or obsolete", token.lexem);
         return EmptyResult;
-        //print_error("STATUS should be current or obsolete", token, type);
-        //goto skip;
     }
 
     np->status = token.type;
-    //type = get_token(fp, token, MAXTOKEN);
+
     parseToken(file, token);
 
-    if (token.type != LT::eDESCRIPTION)
+    if (token.type != LT::DESCRIPTION)
     {
         _errinf.isError = true;
         _errinf.description = formError("Expected DESCRIPTION", token.lexem);
         return EmptyResult;
-        //print_error("Expected DESCRIPTION", token, type);
-        //goto skip;
     }
-    //type = get_token(fp, quoted_string_buffer, MAXTOKEN);
+
     parseToken(file, token);
 
-    if (token.type != LT::eQUOTESTRING)
+    if (token.type != LT::QUOTESTRING)
     {
         _errinf.isError = true;
         _errinf.description = formError("Bad DESCRIPTION", token.lexem);
         return EmptyResult;
-        //print_error("Bad DESCRIPTION", quoted_string_buffer, type);
-        //goto skip;
     }
-    //if (netsnmp_ds_get_boolean(NETSNMP_DS_LIBRARY_ID,
-    //	NETSNMP_DS_LIB_SAVE_MIB_DESCRS))
-    //{
-    np->description = token.lexem;//strdup(quoted_string_buffer);
-    //}
-    //type = get_token(fp, token, MAXTOKEN);
+
+    np->description = token.lexem;
+
     parseToken(file, token);
 
-    if (token.type == LT::eREFERENCE)
+    if (token.type == LT::REFERENCE)
     {
-        //type = get_token(fp, quoted_string_buffer, MAXTOKEN);
         parseToken(file, token);
 
-        if (token.type != LT::eQUOTESTRING)
+        if (token.type != LT::QUOTESTRING)
         {
             _errinf.isError = true;
             _errinf.description = formError("Bad REFERENCE", token.lexem);
             return EmptyResult;
-            //print_error("Bad REFERENCE", quoted_string_buffer, type);
-            //goto skip;
         }
-        np->reference = token.lexem;//strdup(quoted_string_buffer);
-        //type = get_token(fp, token, type);
+        np->reference = token.lexem;
+
         parseToken(file, token);
     }
 
-    while (token.type == LT::eSUPPORTS)
+    while (token.type == LT::SUPPORTS)
     {
         std::string module;
-        //int             modid;
-        //struct tree    *tp;
 
-        //type = get_token(fp, token, MAXTOKEN);
         parseToken(file, token);
 
-        if (token.type != LT::eLABEL)
+        if (token.type != LT::LABEL)
         {
             _errinf.isError = true;
             _errinf.description = formError("Bad module name", token.lexem);
             return EmptyResult;
-            //print_error("Bad module name", token, type);
-            //goto skip;
         }
-        //modid = read_module_internal(token); 
 
         LoadStatus status = readModuleInternal(token.lexem);
 
@@ -1613,424 +1208,321 @@ NodeList Parser::parseCapabilities(std::ifstream& file, const std::string& objNa
             return EmptyResult;
         }
 
-        /*if (modid != MODULE_LOADED_OK && modid != MODULE_ALREADY_LOADED)
-        {
-            print_error("Module not found", token, type);
-            goto skip;
-        }*/
-
         module = token.lexem;
-        //modid = which_module(token);
-        //type = get_token(fp, token, MAXTOKEN);
+
         parseToken(file, token);
 
-        if (token.type != LT::eINCLUDES)
+        if (token.type != LT::INCLUDES)
         {
             _errinf.isError = true;
             _errinf.description = formError("Expected INCLUDES", token.lexem);
             return EmptyResult;
-            //print_error("Expected INCLUDES", token, type);
-            //goto skip;
         }
-        //type = get_token(fp, token, MAXTOKEN);
+
         parseToken(file, token);
 
-        if (token.type != LT::eLEFTBRACKET)
+        if (token.type != LT::LEFTBRACKET)
         {
             _errinf.isError = true;
             _errinf.description = formError("Expected \"{\"", token.lexem);
             return EmptyResult;
-            //print_error("Expected \"{\"", token, type);
-            //goto skip;
         }
         do
         {
-            //type = get_token(fp, token, MAXTOKEN);
             parseToken(file, token);
 
-            if (token.type != LT::eLABEL)
+            if (token.type != LT::LABEL)
             {
                 _errinf.isError = true;
                 _errinf.description = formError("Expected group name", token.lexem);
                 return EmptyResult;
-                //print_error("Expected group name", token, type);
-                //goto skip;
             }
 
-            //tp = find_tree_node(token, modid);
-
-            if (_tree->findNode(token.lexem, module) == nullptr)
+            if ((_tree ? _tree->findNode(token.lexem, module) : nullptr) == nullptr)
             {
                 _errinf.isError = true;
-                _errinf.description = formError("Group not found in module", token.lexem);
+                _errinf.description = formError("Group not found", token.lexem);
                 return EmptyResult;
             }
 
-            //if (!tp)
-            //	print_error("Group not found in module", token, type);
-            //type = get_token(fp, token, MAXTOKEN);
             parseToken(file, token);
 
-        } while (token.type == LT::eCOMMA);
+        } while (token.type == LT::COMMA);
 
-        if (token.type != LT::eRIGHTBRACKET)
+        if (token.type != LT::RIGHTBRACKET)
         {
             _errinf.isError = true;
             _errinf.description = formError("Expected \"}\" after group list", token.lexem);
             return EmptyResult;
-            //print_error("Expected \"}\" after group list", token, type);
-            //goto skip;
         }
-        //type = get_token(fp, token, MAXTOKEN);
+
         parseToken(file, token);
 
-        while (token.type == LT::eVARIATION)
+        while (token.type == LT::VARIATION)
         {
-            //type = get_token(fp, token, MAXTOKEN);
             parseToken(file, token);
 
-            if (token.type != LT::eLABEL)
+            if (token.type != LT::LABEL)
             {
                 _errinf.isError = true;
                 _errinf.description = formError("Bad object name", token.lexem);
                 return EmptyResult;
-                //print_error("Bad object name", token, type);
-                //goto skip;
             }
 
-            if (_tree->findNode(token.lexem, module) == nullptr)
+            if ((_tree ? _tree->findNode(token.lexem, module) : nullptr) == nullptr)
             {
                 _errinf.isError = true;
                 _errinf.description = formError("Object not found in module", token.lexem);
                 return EmptyResult;
             }
 
-            //tp = find_tree_node(token, modid);
-            //if (!tp)
-            //	print_error("Object not found in module", token, type);
-            //type = get_token(fp, token, MAXTOKEN);
             parseToken(file, token);
 
-            if (token.type == LT::eSYNTAX)
+            if (token.type == LT::SYNTAX)
             {
                 eatSyntax(file, token);
-                //type = eat_syntax(fp, token, MAXTOKEN);
+
+                if (_errinf.isError)
+                    return EmptyResult;
+
             }
-            if (token.type == LT::eWRSYNTAX)
+            if (token.type == LT::WRSYNTAX)
             {
                 eatSyntax(file, token);
-                //type = eat_syntax(fp, token, MAXTOKEN);
+
+                if (_errinf.isError)
+                    return EmptyResult;
+
             }
-            if (token.type == LT::eACCESS)
+            if (token.type == LT::ACCESS)
             {
-                //type = get_token(fp, token, MAXTOKEN);
                 parseToken(file, token);
 
-                if (token.type != LT::eACCNOTIFY && token.type != LT::eREADONLY
-                    && token.type != LT::eREADWRITE && token.type != LT::eREADCREATE
-                    && token.type != LT::eWRITEONLY && token.type != LT::eNOTIMPL)
+                if (token.type != LT::ACCNOTIFY && token.type != LT::READONLY
+                    && token.type != LT::READWRITE && token.type != LT::READCREATE
+                    && token.type != LT::WRITEONLY && token.type != LT::NOTIMPL)
                 {
                     _errinf.isError = true;
                     _errinf.description = formError("Bad ACCESS", token.lexem);
                     return EmptyResult;
-                    //print_error("Bad ACCESS", token, type);
-                    //goto skip;
                 }
-                np->access = token.type;
-                //type = get_token(fp, token, MAXTOKEN);
+
                 parseToken(file, token);
             }
 
-            if (token.type == LT::eCREATEREQ)
+            if (token.type == LT::CREATEREQ)
             {
-                //type = get_token(fp, token, MAXTOKEN);
                 parseToken(file, token);
 
-                if (token.type != LT::eLEFTBRACKET)
+                if (token.type != LT::LEFTBRACKET)
                 {
                     _errinf.isError = true;
                     _errinf.description = formError("Expected \"{\"", token.lexem);
                     return EmptyResult;
-                    //print_error("Expected \"{\"", token, type);
-                    //goto skip;
                 }
                 do
                 {
                     parseToken(file, token);
-                    //type = get_token(fp, token, MAXTOKEN);
-                    if (token.type != LT::eLABEL)
+
+                    if (token.type != LT::LABEL)
                     {
                         _errinf.isError = true;
                         _errinf.description = formError("Bad object name in list", token.lexem);
                         return EmptyResult;
-                        //print_error("Bad object name in list", token,
-                        //	type);
-                        //goto skip;
                     }
-                    //type = get_token(fp, token, MAXTOKEN);
+
                     parseToken(file, token);
 
-                } while (token.type == LT::eCOMMA);
+                } while (token.type == LT::COMMA);
 
-                if (token.type != LT::eRIGHTBRACKET)
+                if (token.type != LT::RIGHTBRACKET)
                 {
                     _errinf.isError = true;
                     _errinf.description = formError("Expected \"}\" after list", token.lexem);
                     return EmptyResult;
-                    //print_error("Expected \"}\" after list", token, type);
-                    //goto skip;
                 }
-                //type = get_token(fp, token, MAXTOKEN);
+
                 parseToken(file, token);
             }
 
-            if (token.type == LT::eDEFVAL)
+            if (token.type == LT::DEFVAL)
             {
                 int             level = 1;
-                //type = get_token(fp, token, MAXTOKEN);
                 parseToken(file, token);
 
-                if (token.type != LT::eLEFTBRACKET)
+                if (token.type != LT::LEFTBRACKET)
                 {
                     _errinf.isError = true;
                     _errinf.description = formError("Expected \"{\" after DEFVAL", token.lexem);
                     return EmptyResult;
-                    //print_error("Expected \"{\" after DEFVAL", token,
-                    //	type);
-                    //goto skip;
                 }
 
                 do
                 {
-                    //type = get_token(fp, token, MAXTOKEN);
                     parseToken(file, token);
 
-                    if (token.type == LT::eLEFTBRACKET)
+                    if (token.type == LT::LEFTBRACKET)
                         level++;
-                    else if (token.type == LT::eRIGHTBRACKET)
+                    else if (token.type == LT::RIGHTBRACKET)
                         level--;
 
-                } while ((token.type != LT::eRIGHTBRACKET || level != 0) && token.type != LT::eENDOFFILE);
+                } while ((token.type != LT::RIGHTBRACKET || level != 0) && token.type != LT::ENDOFFILE);
 
-                if (token.type != LT::eRIGHTBRACKET)
+                if (token.type != LT::RIGHTBRACKET)
                 {
                     _errinf.isError = true;
                     _errinf.description = formError("Missing \"}\" after DEFVAL", token.lexem);
                     return EmptyResult;
-                    //print_error("Missing \"}\" after DEFVAL", token, type);
-                    //goto skip;
                 }
 
                 parseToken(file, token);
-                //type = get_token(fp, token, MAXTOKEN);
             }
 
-            if (token.type != LT::eDESCRIPTION)
+            if (token.type != LT::DESCRIPTION)
             {
                 _errinf.isError = true;
                 _errinf.description = formError("Expected DESCRIPTION", token.lexem);
                 return EmptyResult;
-                //print_error("Expected DESCRIPTION", token, type);
-                //goto skip;
             }
-            //type = get_token(fp, quoted_string_buffer, MAXTOKEN);
+
             parseToken(file, token);
 
-            if (token.type != LT::eQUOTESTRING)
+            if (token.type != LT::QUOTESTRING)
             {
                 _errinf.isError = true;
                 _errinf.description = formError("Bad DESCRIPTION", token.lexem);
                 return EmptyResult;
-                //print_error("Bad DESCRIPTION", quoted_string_buffer, type);
-                //goto skip;
             }
-            //type = get_token(fp, token, MAXTOKEN);
+
             parseToken(file, token);
         }
     }
 
-    if (token.type != LT::eEQUALS)
+    if (token.type != LT::EQUALS)
     {
         _errinf.isError = true;
         _errinf.description = formError("Expected \"::=\"", token.lexem);
         return EmptyResult;
     }
-    //print_error("Expected \"::=\"", token, type);
 
     return mergeParsedObjectid(np, file);
-    //skip:
-    //	while (type != EQUALS && type != ENDOFFILE)
-    //	{
-    //		type = get_token(fp, quoted_string_buffer, MAXQUOTESTR);
-    //	}
-    //return merge_parse_objectid(np, fp, name);
 }
 
-/*
-* Parses an asn type.  Structures are ignored by this parser.
-* Returns NULL on error.
-*/
 NodeList Parser::parseASN(std::ifstream& file, Token& token, const std::string& objName)
 {
-    //int             type, i;
-    //char            token[MAXTOKEN];
-    //char            quoted_string_buffer[MAXQUOTESTR];
-    //char           *hint = NULL;
-    //char           *descr = NULL;
-    //struct tc      *tcp;
-
-    //Node::Ptr np(new Node);
-    //np->label = objName;
     TC tc;
-    //Token token;
-    //int level = 0;
 
     parseToken(file, token);
-    //type = get_token(fp, token, MAXTOKEN);
-    if (token.type == LT::eSEQUENCE || token.type == LT::eCHOICE)
+
+    if (token.type == LT::SEQUENCE || token.type == LT::CHOICE)
     {
         int level = 0;
         LT lasttype = token.type;
 
         parseToken(file, token);
-        while (token.type != LT::eENDOFFILE)
+        while (token.type != LT::ENDOFFILE)
         {
-            if (token.type == LT::eLEFTBRACKET)
+            if (token.type == LT::LEFTBRACKET)
             {
                 level++;
             }
-            else if (token.type == LT::eRIGHTBRACKET && --level == 0)
+            else if (token.type == LT::RIGHTBRACKET && --level == 0)
             {
                 tc.descriptor = objName;
-                tc.type = lasttype;
+                tc.syntax = lasttype;
                 tc.module = _moduleName;
-                _tclist.addTC(tc);
+                _tclist.push_back(tc);
 
                 parseToken(file, token);
                 return EmptyResult;
-                //*ntype = get_token(fp, ntoken, MAXTOKEN);
-                //return NULL;
             }
             parseToken(file, token);
         }
 
         _errinf.isError = true;
         _errinf.description = formError("Expected \"}\"", token.lexem);
-        //return EmptyResult;
-        //print_error("Expected \"}\"", token, type);
-        //return NULL;
     }
-    else if (token.type == LT::eLEFTBRACKET)
+    else if (token.type == LT::LEFTBRACKET)
     {
-        //struct node    *np;
-        //int             ch_next = '{';
-
         file.unget();
-        //ungetc(ch_next, fp);
-
         auto nodes = parseObjectid(file, objName);
-        //np = parse_objectid(fp, name);
 
         if (!nodes.empty())
         {
             parseToken(file, token);
             return nodes;
         }
-
-        //return EmptyResult;
-
-        //if (np != NULL)
-        //{
-        //	*ntype = get_token(fp, ntoken, MAXTOKEN);
-        //	return np;
-        //}
-        //return NULL;
     }
-    else if (token.type == LT::eLEFTSQBRACK)
+    else if (token.type == LT::LEFTSQBRACK)
     {
         bool size = false;
 
         do
         {
             parseToken(file, token);
-            //type = get_token(fp, token, MAXTOKEN);
-        } while (token.type != LT::eENDOFFILE && token.type != LT::eRIGHTSQBRACK);
 
-        if (token.type != LT::eRIGHTSQBRACK)
+        } while (token.type != LT::ENDOFFILE && token.type != LT::RIGHTSQBRACK);
+
+        if (token.type != LT::RIGHTSQBRACK)
         {
             _errinf.isError = true;
             _errinf.description = formError("Expected \"]\"", token.lexem);
             return EmptyResult;
-            //print_error("Expected \"]\"", token, type);
-            //return NULL;
         }
-        //type = get_token(fp, token, MAXTOKEN);
+
         parseToken(file, token);
 
-        if (token.type == LT::eIMPLICIT)
+        if (token.type == LT::IMPLICIT)
             parseToken(file, token);
-        //type = get_token(fp, token, MAXTOKEN);
 
         LT lasttype = token.type;
 
         parseToken(file, token);
-        //*ntype = get_token(fp, ntoken, MAXTOKEN);
-        if (token.type == LT::eLEFTPAREN)
+
+        if (token.type == LT::LEFTPAREN)
         {
             switch (lasttype)
             {
-            case LT::eOCTETSTR:
-                //*ntype = get_token(fp, ntoken, MAXTOKEN);
+            case LT::OCTETSTR:
+
                 parseToken(file, token);
 
-                //if (*ntype != SIZE)
-                if (token.type != LT::eSIZE)
+                if (token.type != LT::SIZE)
                 {
                     _errinf.isError = true;
                     _errinf.description = formError("Expected SIZE", token.lexem);
                     return EmptyResult;
-                    //print_error("Expected SIZE", ntoken, *ntype);
-                    //return NULL;
                 }
                 size = true;
-                //*ntype = get_token(fp, ntoken, MAXTOKEN);
                 parseToken(file, token);
 
-                if (token.type != LT::eLEFTPAREN)
-                    //if (*ntype != LEFTPAREN)
+                if (token.type != LT::LEFTPAREN)
                 {
                     _errinf.isError = true;
                     _errinf.description = formError("Expected \"(\"", token.lexem);
                     return EmptyResult;
-                    //print_error("Expected \"(\" after SIZE", ntoken,
-                    //	*ntype);
-                    //return NULL;
                 }
+
                 /* FALL THROUGH */
-            case LT::eINTEGER:
-                //*ntype = get_token(fp, ntoken, MAXTOKEN);
+            case LT::INTEGER:
                 parseToken(file, token);
 
                 do
                 {
-                    if (token.type != LT::eNUMBER)
+                    if (token.type != LT::NUMBER)
                     {
                         _errinf.isError = true;
                         _errinf.description = formError("Expected NUMBER", token.lexem);
                         return EmptyResult;
                     }
-                    //if (*ntype != NUMBER)
-                        //print_error("Expected NUMBER", ntoken, *ntype);
-                    //*ntype = get_token(fp, ntoken, MAXTOKEN);
+
                     parseToken(file, token);
 
-                    //if (*ntype == RANGE)
-                    if (token.type == LT::eRANGE)
+                    if (token.type == LT::RANGE)
                     {
-                        //*ntype = get_token(fp, ntoken, MAXTOKEN);
                         parseToken(file, token);
 
-                        if (token.type != LT::eNUMBER)
+                        if (token.type != LT::NUMBER)
                         {
                             _errinf.isError = true;
                             _errinf.description = formError("Expected NUMBER", token.lexem);
@@ -2038,474 +1530,316 @@ NodeList Parser::parseASN(std::ifstream& file, Token& token, const std::string& 
                         }
 
                         parseToken(file, token);
-                        //if (*ntype != NUMBER)
-                            //print_error("Expected NUMBER", ntoken, *ntype);
-                        //*ntype = get_token(fp, ntoken, MAXTOKEN);
                     }
-                } while (token.type == LT::eBAR);//(*ntype == BAR);
+                } while (token.type == LT::BAR);
 
-                //if (*ntype != RIGHTPAREN)
-                if (token.type != LT::eRIGHTPAREN)
+                if (token.type != LT::RIGHTPAREN)
                 {
                     _errinf.isError = true;
                     _errinf.description = formError("Expected \")\"", token.lexem);
                     return EmptyResult;
-                    //print_error("Expected \")\"", ntoken, *ntype);
-                    //return NULL;
                 }
-                //*ntype = get_token(fp, ntoken, MAXTOKEN);
+
                 parseToken(file, token);
 
                 if (size)
                 {
-                    //if (*ntype != RIGHTPAREN)
-                    if (token.type != LT::eRIGHTPAREN)
+                    if (token.type != LT::RIGHTPAREN)
                     {
                         _errinf.isError = true;
                         _errinf.description = formError("Expected \")\"", token.lexem);
                         return EmptyResult;
-                        //print_error("Expected \")\" to terminate SIZE",
-                        //	ntoken, *ntype);
-                        //return NULL;
                     }
-                    //*ntype = get_token(fp, ntoken, MAXTOKEN);
+
                     parseToken(file, token);
                 }
             }
         }
         //return EmptyResult;
-        //return NULL;
     }
     else
     {
-        if (token.type == LT::eCONVENTION)
+        if (token.type == LT::CONVENTION)
         {
-            while (token.type != LT::eSYNTAX && token.type != LT::eENDOFFILE)
+            while (token.type != LT::SYNTAX && token.type != LT::ENDOFFILE)
             {
-                if (token.type == LT::eDISPLAYHINT)
+                if (token.type == LT::DISPLAYHINT)
                 {
-                    //type = get_token(fp, token, MAXTOKEN);
                     parseToken(file, token);
 
-                    if (token.type != LT::eQUOTESTRING)
+                    if (token.type != LT::QUOTESTRING)
                     {
                         _errinf.isError = true;
                         _errinf.description = formError("DISPLAY-HINT must be string", token.lexem);
                         return EmptyResult;
-                        //print_error("DISPLAY-HINT must be string", token,
-                        //	type);
                     }
-                    //else
-                    //{
+
                     tc.hint = token.lexem;
-                    //np->hint = token.lexem;
-                    //free(hint);
-                    //hint = token.lexem;//strdup(token);
-                //}
                 }
-                else if (token.type == LT::eDESCRIPTION)
+                else if (token.type == LT::DESCRIPTION)
                 {
-                    //type = get_token(fp, quoted_string_buffer, MAXQUOTESTR);
                     parseToken(file, token);
 
-                    if (token.type != LT::eQUOTESTRING)
+                    if (token.type != LT::QUOTESTRING)
                     {
                         _errinf.isError = true;
                         _errinf.description = formError("DESCRIPTION must be string", token.lexem);
                         return EmptyResult;
-                        //print_error("DESCRIPTION must be string", token,
-                        //	type);
                     }
-                    //else
-                    //{
+
                     tc.description = token.lexem;
-                    //np->description = token.lexem;
-                    //free(descr);
-                    //descr = strdup(quoted_string_buffer);
-                //}
+                }
+                else if (token.type == LT::REFERENCE)
+                {
+                    parseToken(file, token);
+
+                    if (token.type != LT::QUOTESTRING)
+                    {
+                        _errinf.isError = true;
+                        _errinf.description = formError("REFERENCE must be string", token.lexem);
+                        return EmptyResult;
+                    }
+
+                    tc.reference = token.lexem;
                 }
                 else
                     parseToken(file, token);
-                //type =
-                //get_token(fp, quoted_string_buffer, MAXQUOTESTR);
             }
-            //type = get_token(fp, token, MAXTOKEN);
+
             parseToken(file, token);
 
-            if (token.type == LT::eOBJECT)
+            if (token.type == LT::OBJECT)
             {
-                //type = get_token(fp, token, MAXTOKEN);
                 parseToken(file, token);
 
-                if (token.type != LT::eIDENTIFIER)
+                if (token.type != LT::IDENTIFIER)
                 {
                     _errinf.isError = true;
                     _errinf.description = formError("Expected IDENTIFIER", token.lexem);
                     return EmptyResult;
-                    //print_error("Expected IDENTIFIER", token, type);
-                    //goto err;
                 }
 
-                token.type = LT::eOBJID;
-                //np->type = LT::eOBJID;
-                //type = OBJID;
+                token.type = LT::OBJID;
             }
         }
-        else if (token.type == LT::eOBJECT)
+        else if (token.type == LT::OBJECT)
         {
-            //type = get_token(fp, token, MAXTOKEN);
             parseToken(file, token);
 
-            if (token.type != LT::eIDENTIFIER)
+            if (token.type != LT::IDENTIFIER)
             {
                 _errinf.isError = true;
                 _errinf.description = formError("Expected IDENTIFIER", token.lexem);
                 return EmptyResult;
-                //print_error("Expected IDENTIFIER", token, type);
-                //goto err;
             }
 
-            token.type = LT::eOBJID;
-            //np->type = LT::eOBJID;
-            //type = OBJID;
+            token.type = LT::OBJID;
         }
 
-        if (token.type == LT::eLABEL)
+        if (token.type == LT::LABEL)
         {
-            int ind = _tclist.getTCIndex(token.lexem);// , moduleName);
 
-            if (ind != -1)
+            for (size_t i = 0, size = _tclist.size(); i < size; ++i)
             {
+                auto const& tc = _tclist[i];
 
-                token.type = _tclist.getTC(ind).type;
+                if (tc.descriptor == token.lexem)
+                {
+                    token.type = tc.syntax;
+                    break;
+                }
             }
-
-            //type = get_tc(token, current_module, NULL, NULL, NULL, NULL);
         }
 
-        /*
-        * textual convention
-        */
-        //for (i = 0; i < MAXTC; i++) 
-        //{
-        //	if (tclist[i].type == 0)
-        //		break;
-        //}
-
-        /*if (i == MAXTC)
-        {
-            print_error("Too many textual conventions", token, type);
-            goto err;
-        }*/
-        if (!(token.type & LT::eSYNTAX_MASK))
+        if (!(token.type & LT::SYNTAX_MASK))
         {
             _errinf.isError = true;
             _errinf.description = formError("Textual convention doesn't map to real type", token.lexem);
             return EmptyResult;
-            //print_error("Textual convention doesn't map to real type",
-            //	token, type);
-            //goto err;
         }
 
         tc.module = _moduleName;
         tc.descriptor = objName;
-        tc.type = token.type;
+        tc.syntax = token.type;
 
-        //tcp = &tclist[i];
-        //tcp->modid = current_module;
-        //tcp->descriptor = strdup(name);
-        //tcp->hint = hint;
-        //tcp->description = descr;
-        //tcp->type = type;
-        //*ntype = get_token(fp, ntoken, MAXTOKEN);
         parseToken(file, token);
 
-        //if (*ntype == LEFTPAREN)
-        if (token.type == LT::eLEFTPAREN)
+        if (token.type == LT::LEFTPAREN)
         {
             tc.ragnes = parseRanges(file);
-            //tcp->ranges = parse_ranges(fp, &tcp->ranges);
             parseToken(file, token);
-            //*ntype = get_token(fp, ntoken, MAXTOKEN);
         }
-        //else if (*ntype == LEFTBRACKET)
-        else if (token.type == LT::eLEFTBRACKET)
+        else if (token.type == LT::LEFTBRACKET)
         {
-            /*
-            * if there is an enumeration list, parse it
-            */
             tc.enums = parseEnums(file);
-            //tcp->enums = parse_enumlist(fp, &tcp->enums);
             parseToken(file, token);
-            //*ntype = get_token(fp, ntoken, MAXTOKEN);
         }
 
-        _tclist.addTC(tc);
-        //return NULL;
-        //return EmptyResult;
+        _tclist.push_back(tc);
     }
 
     return EmptyResult;
-
-    //err:
-    //	SNMP_FREE(descr);
-    //	SNMP_FREE(hint);
-    //	return NULL;
 }
 
 NodeList Parser::parseTrap(std::ifstream& file, const std::string& objName)
 {
-    //register int    type;
-    //char            token[MAXTOKEN];
-    //char            quoted_string_buffer[MAXQUOTESTR];
-    //register struct node *np;
     Node::Ptr np(new Node);
     np->label = objName;
     np->modules.push_back(_moduleName);
 
     Token token;
-
-    //np = alloc_node(current_module);
-    //if (np == NULL)
-    //	return (NULL);
-    //type = get_token(fp, token, MAXTOKEN);
     parseToken(file, token);
 
-    while (token.type != LT::eEQUALS && token.type != LT::eENDOFFILE)
+    while (token.type != LT::EQUALS && token.type != LT::ENDOFFILE)
     {
         switch (token.type)
         {
-        case LT::eDESCRIPTION:
-            //type = get_token(fp, quoted_string_buffer, MAXQUOTESTR);
+        case LT::DESCRIPTION:
             parseToken(file, token);
 
-            if (token.type != LT::eQUOTESTRING)
+            if (token.type != LT::QUOTESTRING)
             {
                 _errinf.isError = true;
                 _errinf.description = formError("Bad DESCRIPTION", token.lexem);
                 return EmptyResult;
-                //print_error("Bad DESCRIPTION", quoted_string_buffer, type);
-                //free_node(np);
-                //return NULL;
             }
-            //if (netsnmp_ds_get_boolean(NETSNMP_DS_LIBRARY_ID,
-            //	NETSNMP_DS_LIB_SAVE_MIB_DESCRS))
-            //{
-            np->description = token.lexem;//strdup(quoted_string_buffer);
-            //}
+
+            np->description = token.lexem;
+
             break;
-        case LT::eREFERENCE:
-            /* I'm not sure REFERENCEs are legal in smiv1 traps??? */
-            //type = get_token(fp, quoted_string_buffer, MAXQUOTESTR);
+        case LT::REFERENCE:
+
             parseToken(file, token);
 
-            if (token.type != LT::eQUOTESTRING)
+            if (token.type != LT::QUOTESTRING)
             {
                 _errinf.isError = true;
                 _errinf.description = formError("Bad REFERENCE", token.lexem);
                 return EmptyResult;
-                //print_error("Bad REFERENCE", quoted_string_buffer, type);
-                //free_node(np);
-                //return NULL;
             }
-            np->reference = token.lexem;//strdup(quoted_string_buffer);
+            np->reference = token.lexem;
+
             break;
-        case LT::eENTERPRISE:
-            //type = get_token(fp, token, MAXTOKEN);
+        case LT::ENTERPRISE:
+
             parseToken(file, token);
 
-            if (token.type == LT::eLEFTBRACKET)
+            if (token.type == LT::LEFTBRACKET)
             {
-                //type = get_token(fp, token, MAXTOKEN);
                 parseToken(file, token);
 
-                if (token.type != LT::eLABEL)
+                if (token.type != LT::LABEL)
                 {
                     _errinf.isError = true;
-                    _errinf.description = formError("Bad trap format", token.lexem);
+                    _errinf.description = formError("Bad ENTERPRISE format", token.lexem);
                     return EmptyResult;
-                    //print_error("Bad Trap Format", token, type);
-                    //free_node(np);
-                    //return NULL;
                 }
-                np->parentName = token.lexem;//strdup(token);
+
+                np->parentName = token.lexem;
                 /*
                 * Get right bracket
                 */
-                //type = get_token(fp, token, MAXTOKEN);
                 parseToken(file, token);
             }
-            else if (token.type == LT::eLABEL)
+            else if (token.type == LT::LABEL)
             {
-                np->parentName = token.lexem;//strdup(token);
+                np->parentName = token.lexem;
             }
             else
             {
+                _errinf.isError = true;
+                _errinf.description = formError("Bad ENTERPRISE format", token.lexem);
                 return EmptyResult;
-                //free_node(np);
-                //return NULL;
             }
             break;
-        case LT::eVARIABLES:
-            //np->varbinds = getVarbinds(fp, &np->varbinds);
+        case LT::VARIABLES:
+
             np->varbinds = parseVarbinds(file);
-            //if (!np->varbinds)
+
             if (np->varbinds.empty())
             {
-                _errinf.isError = true;
-                _errinf.description = formError("Bad VARIABLES list", token.lexem);
+                if (_errinf.isError == false)
+                {
+                    _errinf.isError = true;
+                    _errinf.description = formError("Bad VARIABLES list", token.lexem);
+                }
                 return EmptyResult;
-                //print_error("Bad VARIABLES list", token, type);
-                //free_node(np);
-                //return NULL;
             }
             break;
         default:
-            /*
-            * NOTHING
-            */
             break;
         }
-        //type = get_token(fp, token, MAXTOKEN);
+
         parseToken(file, token);
     }
-    //type = get_token(fp, token, MAXTOKEN);
-    parseToken(file, token);
-    //np->label = strdup(name);
 
-    if (token.type != LT::eNUMBER)
+    parseToken(file, token);
+
+    if (token.type != LT::NUMBER)
     {
         _errinf.isError = true;
         _errinf.description = formError("Expected a NUMBER", token.lexem);
         return EmptyResult;
-        //print_error("Expected a Number", token, type);
-        //free_node(np);
-        //return NULL;
     }
+
     np->subid = strtoul(token.lexem.c_str(), nullptr, 10);
 
-    //np->next = alloc_node(current_module);
-
-    //if (np->next == NULL)
-    //{
-    //	free_node(np);
-    //	return (NULL);
-    //}
-
-    /* Catch the syntax error */
     if (np->parentName.empty())
     {
         return EmptyResult;
-        //free_node(np->next);
-        //free_node(np);
-        //gMibError = MODULE_SYNTAX_ERROR;
-        //return (NULL);
     }
 
     return NodeList({ np });
-    //np->next->parent = np->parent;
-    //np->parent = (char *)malloc(strlen(np->parent) + 2);
-    //if (np->parent == NULL)
-    //{
-    //	free_node(np->next);
-    //	free_node(np);
-    //	return (NULL);
-    //}
-    //strcpy(np->parent, np->next->parent);
-    //strcat(np->parent, "#");
-    //np->next->label = strdup(np->parent);
-    //return np;
 }
 
-/*
-* Parses a MACRO definition
-* Expect BEGIN, discard everything to end.
-* Returns 0 on error.
-*/
 NodeList Parser::parseMacro(std::ifstream& file)
 {
-    //register int    type;
-    //char            token[MAXTOKEN];
-    //struct node    *np;
-    //int             iLine = mibLine;
-
     Node::Ptr np(new Node);
-
     Token token;
 
-
-    //np = alloc_node(current_module);
-    //if (np == NULL)
-    //	return (NULL);
-    //type = get_token(fp, token, sizeof(token));
     parseToken(file, token);
 
-    while (token.type != LT::eEQUALS && token.type != LT::eENDOFFILE)
+    while (token.type != LT::EQUALS && token.type != LT::BEGIN && token.type != LT::ENDOFFILE)
     {
         parseToken(file, token);
-        //type = get_token(fp, token, sizeof(token));
     }
 
-    if (token.type != LT::eEQUALS)
+    if (token.type != LT::EQUALS)
     {
+        _errinf.isError = true;
+        _errinf.description = formError("Expected \"::=\"", token.lexem);
         return EmptyResult;
-        //if (np)
-        //	free_node(np);
-        //return NULL;
     }
 
-    while (token.type != LT::eBEGIN && token.type != LT::eENDOFFILE)
+    while (token.type != LT::BEGIN && token.type != LT::ENDOFFILE)
     {
         parseToken(file, token);
-        //type = get_token(fp, token, sizeof(token));
     }
 
-    if (token.type != LT::eBEGIN)
+    if (token.type != LT::BEGIN)
     {
+        _errinf.isError = true;
+        _errinf.description = formError("Expected BEGIN", token.lexem);
         return EmptyResult;
-        //if (np)
-        //	free_node(np);
-        //return NULL;
     }
 
-    while (token.type != LT::eEND && token.type != LT::eENDOFFILE)
+    while (token.type != LT::END && token.type != LT::ENDOFFILE)
     {
         parseToken(file, token);
-        //type = get_token(fp, token, sizeof(token));
     }
 
-    if (token.type != LT::eEND)
+    if (token.type != LT::END)
     {
+        _errinf.isError = true;
+        _errinf.description = formError("Expected END", token.lexem);
         return EmptyResult;
-        //if (np)
-        //	free_node(np);
-        //return NULL;
     }
-
-    //if (netsnmp_ds_get_int(NETSNMP_DS_LIBRARY_ID,
-    //	NETSNMP_DS_LIB_MIB_WARNINGS))
-    //{
-    //	snmp_log(LOG_WARNING,
-    //		"%s MACRO (lines %d..%d parsed and ignored).\n", name,
-    //		iLine, mibLine);
-    //}
 
     return NodeList({ np });
-    //return np;
 }
 
-
-/*
-Merge the parsed object identifier with the existing node.
-If there is a problem with the identifier, release the existing node.
-*/
 NodeList Parser::mergeParsedObjectid(Node::Ptr& np, std::ifstream& file)
 {
-    //struct node    *nnp;
-    /*
-    * printf("merge defval --> %s\n",np->defaultValue);
-    */
-
     auto res = parseObjectid(file, np->label);
 
     if (res.empty())
@@ -2521,82 +1855,11 @@ NodeList Parser::mergeParsedObjectid(Node::Ptr& np, std::ifstream& file)
     last = np;
 
     return res;
-
-    //Node::Ptr nnp = parse_objectid(fp, name);
-
-    //if (nnp)
-    //{
-
-    //	/*
-    //	* apply last OID sub-identifier data to the information
-    //	*/
-    //	/*
-    //	* already collected for this node.
-    //	*/
-    //	struct node    *headp, *nextp;
-    //	int             ncount = 0;
-    //	nextp = headp = nnp;
-    //	while (nnp->next)
-    //	{
-    //		nextp = nnp;
-    //		ncount++;
-    //		nnp = nnp->next;
-    //	}
-
-    //	np->label = nnp->label;
-    //	np->subid = nnp->subid;
-    //	np->modid = nnp->modid;
-    //	np->parent = nnp->parent;
-    //	if (nnp->filename != NULL)
-    //	{
-    //		free(nnp->filename);
-    //	}
-    //	free(nnp);
-
-    //	if (ncount)
-    //	{
-    //		nextp->next = np;
-    //		np = headp;
-    //	}
-    //}
-    //else
-    //{
-    //	free_node(np);
-    //	np = NULL;
-    //}
 }
 
-
-/*
-* Parse a sequence of object subidentifiers for the given name.
-* The "label OBJECT IDENTIFIER ::=" portion has already been parsed.
-*
-* The majority of cases take this form :
-* label OBJECT IDENTIFIER ::= { parent 2 }
-* where a parent label and a child subidentifier number are specified.
-*
-* Variations on the theme include cases where a number appears with
-* the parent, or intermediate subidentifiers are specified by label,
-* by number, or both.
-*
-* Here are some representative samples :
-* internet        OBJECT IDENTIFIER ::= { iso org(3) dod(6) 1 }
-* mgmt            OBJECT IDENTIFIER ::= { internet 2 }
-* rptrInfoHealth  OBJECT IDENTIFIER ::= { snmpDot3RptrMgt 0 4 }
-*
-* Here is a very rare form :
-* iso             OBJECT IDENTIFIER ::= { 1 }
-*
-* Returns NULL on error.  When this happens, memory may be leaked.
-*/
 NodeList Parser::parseObjectid(std::ifstream& file, const std::string& objName)
 {
-    //register int    count;
-    //register struct subid_ss *op, *nop;
-    //int             length;
-    //struct subid_ss  loid[32];
-    //struct node    *np, *root = NULL, *oldnp = NULL;
-    //struct tree    *tp;
+
     Node::Ptr np = nullptr;
     auto oids = parseOIDlist(file);
 
@@ -2605,42 +1868,38 @@ NodeList Parser::parseObjectid(std::ifstream& file, const std::string& objName)
 
     NodeList res;
 
-    // —четчик анонимных узлов
-    // —лучай: rptrInfoHealth  OBJECT IDENTIFIER ::= { snmpDot3RptrMgt 0 4 }
+    // счетчик анонимных узлов
+    // случай: rptrInfoHealth  OBJECT IDENTIFIER ::= { snmpDot3RptrMgt 0 4 }
     static unsigned int anonymous = 0;
 
 
     if (oids.empty())
     {
         _errinf.isError = true;
-        _errinf.description = formError("Bad object identifier", "");
+        _errinf.description = formError("Bad object identifier");
         return res;
     }
-
-    //if ((length = getoid(fp, loid, 32)) == 0)
-    //{
-    //	print_error("Bad object identifier", NULL, CONTINUE);
-    //	return NULL;
-    //}
-
-    /*
-    * Handle numeric-only object identifiers,
-    *  by labelling the first sub-identifier
-    */
 
     if (oids[0].label.empty())
     {
         if (oids.size() == 1)
         {
             _errinf.isError = true;
-            _errinf.description = formError("Attempt to define a root oid", "");
+            _errinf.description = formError("Attempt to define a root oid");
             return res;
         }
 
         auto& oid = oids[0];
 
-        //the module for the MIB roots has an empty name
-        auto mibRootsModule = _tree->findModule("");
+        auto const& mibRootsModule = _tree ? _tree->findModule(ROOTS_MODULE_NAME) : nullptr;
+
+        if (mibRootsModule == nullptr)
+        {
+            _errinf.isError = true;
+            _errinf.description = "Tree is not set";
+            return res;
+        }
+
         auto const& roots = mibRootsModule->nodes;
 
         for (auto const& root : roots)
@@ -2653,26 +1912,6 @@ NodeList Parser::parseObjectid(std::ifstream& file, const std::string& objName)
         }
     }
 
-    //op = loid;
-    //if (!op->label)
-    //{
-    //	if (length == 1)
-    //	{
-    //		print_error("Attempt to define a root oid", name, OBJECT);
-    //		return NULL;
-    //	}
-    //	for (tp = tree_head; tp; tp = tp->next_peer)
-    //		if ((int)tp->subid == op->subid)
-    //		{
-    //			op->label = strdup(tp->label);
-    //			break;
-    //		}
-    //}
-
-    /*
-    * Handle  "label OBJECT-IDENTIFIER ::= { subid }"
-    */
-
     if (oids.size() == 1)
     {
         np = Node::Ptr(new Node);
@@ -2682,23 +1921,6 @@ NodeList Parser::parseObjectid(std::ifstream& file, const std::string& objName)
         res.push_back(np);
         return res;
     }
-
-    /*if (length == 1)
-    {
-        op = loid;
-        np = alloc_node(op->modid);
-        if (np == NULL)
-            return (NULL);
-        np->subid = op->subid;
-        np->label = strdup(name);
-        np->parent = op->label;
-        return np;
-    }*/
-
-    /*
-    * For each parent-child subid pair in the subid array,
-    * create a node and link it into the node list.
-    */
 
     size_t size = oids.size();
     for (size_t i = 0; i < size - 1; ++i)
@@ -2729,152 +1951,57 @@ NodeList Parser::parseObjectid(std::ifstream& file, const std::string& objName)
         {
             res.clear();
             break;
-            //return res;
         }
 
         res.push_back(np);
     }
 
     return res;
-
-    //	for (count = 0, op = loid, nop = loid + 1; count < (length - 1);
-    //		count++, op++, nop++)
-    //	{
-    //		/*
-    //		* every node must have parent's name and child's name or number
-    //		*/
-    //		/*
-    //		* XX the next statement is always true -- does it matter ??
-    //		*/
-    //		if (op->label && (nop->label || (nop->subid != -1)))
-    //		{
-    //			np = alloc_node(nop->modid);
-    //			if (np == NULL)
-    //				goto err;
-    //			if (root == NULL)
-    //				root = np;
-    //
-    //			np->parent = strdup(op->label);
-    //			if (count == (length - 2))
-    //			{
-    //				/*
-    //				* The name for this node is the label for this entry
-    //				*/
-    //				np->label = strdup(name);
-    //				if (np->label == NULL)
-    //					goto err;
-    //			}
-    //			else
-    //			{
-    //				if (!nop->label)
-    //				{
-    //					nop->label = (char *)malloc(20 + ANON_LEN);
-    //					if (nop->label == NULL)
-    //						goto err;
-    //					sprintf(nop->label, "%s%d", ANON, anonymous++);
-    //				}
-    //				np->label = strdup(nop->label);
-    //			}
-    //			if (nop->subid != -1)
-    //				np->subid = nop->subid;
-    //			else
-    //				print_error("Warning: This entry is pretty silly",
-    //					np->label, CONTINUE);
-    //
-    //			/*
-    //			* set up next entry
-    //			*/
-    //			if (oldnp)
-    //				oldnp->next = np;
-    //			oldnp = np;
-    //		}                       /* end if(op->label... */
-    //	}
-    //
-    //out:
-    //	/*
-    //	* free the loid array
-    //	*/
-    //	for (count = 0, op = loid; count < length; count++, op++)
-    //	{
-    //		if (op->label)
-    //			free(op->label);
-    //	}
-    //
-    //	return root;
-    //
-    //err:
-    //	for (; root; root = np)
-    //	{
-    //		np = root->next;
-    //		free_node(root);
-    //	}
-    //	goto out;
 }
 
-
-/*
-* Takes a list of the form:
-* { iso org(3) dod(6) 1 }
-* and creates several nodes, one for each parent-child pair.
-* Returns 0 on error.
-*/
 std::vector<SubID> Parser::parseOIDlist(std::ifstream& file)
 {
-    //register int    count;
-    //int             type;
-    //char            token[MAXTOKEN];
     std::vector<SubID> res;
     SubID sub;
     Token token;
 
     parseToken(file, token);
 
-    if (token.type != LT::eLEFTBRACKET)
+    if (token.type != LT::LEFTBRACKET)
     {
         _errinf.isError = true;
         _errinf.description = formError("Expected \"{\"", token.lexem);
-        //print_error("Expected \"{\"", token, type);
         return res;
     }
 
-    //if ((type = get_token(fp, token, MAXTOKEN)) != LEFTBRACKET)
-    //{
-    //	print_error("Expected \"{\"", token, type);
-    //	return 0;
-    //}
     parseToken(file, token);
-    //type = get_token(fp, token, MAXTOKEN);
 
-    while (token.type != LT::eRIGHTBRACKET && token.type != LT::eENDOFFILE)
+    while (token.type != LT::RIGHTBRACKET && token.type != LT::ENDOFFILE)
     {
         sub.label.clear();
         sub.subid = -1;
-        //id->label = NULL;
-        //id->modid = current_module;
-        //id->subid = -1;
-        if (token.type == LT::eRIGHTBRACKET)
+        if (token.type == LT::RIGHTBRACKET)
             return res;
         //return count;
-        if (token.type == LT::eLABEL)
+        if (token.type == LT::LABEL)
         {
             /*
             * this entry has a label
             */
             sub.label = token.lexem;
             parseToken(file, token);
-            //id->label = strdup(token);
-            //type = get_token(fp, token, MAXTOKEN);
-            if (token.type == LT::eLEFTPAREN)
+
+            if (token.type == LT::LEFTPAREN)
             {
                 parseToken(file, token);
-                //type = get_token(fp, token, MAXTOKEN);
-                if (token.type == LT::eNUMBER)
+
+                if (token.type == LT::NUMBER)
                 {
                     sub.subid = strtoul(token.lexem.c_str(), nullptr, 10);
-                    //id->subid = strtoul(token, NULL, 10);
+
                     parseToken(file, token);
 
-                    if (token.type != LT::eRIGHTPAREN)
+                    if (token.type != LT::RIGHTPAREN)
                     {
                         _errinf.isError = true;
                         _errinf.description = formError("Expected \")\"", token.lexem);
@@ -2883,13 +2010,6 @@ std::vector<SubID> Parser::parseOIDlist(std::ifstream& file)
                     }
 
                     parseToken(file, token);
-                    //if ((type =
-                    //	get_token(fp, token, MAXTOKEN)) != RIGHTPAREN)
-                    //{
-                    //	print_error("Expected a closing parenthesis",
-                    //		token, type);
-                    //	return 0;
-                    //}
                 }
                 else
                 {
@@ -2897,8 +2017,6 @@ std::vector<SubID> Parser::parseOIDlist(std::ifstream& file)
                     _errinf.description = formError("Expected a number", token.lexem);
                     res.clear();
                     return res;
-                    //print_error("Expected a number", token, type);
-                    //return 0;
                 }
             }
             //else
@@ -2906,14 +2024,10 @@ std::vector<SubID> Parser::parseOIDlist(std::ifstream& file)
             //	continue;
             //}
         }
-        else if (token.type == LT::eNUMBER)
+        else if (token.type == LT::NUMBER)
         {
-            /*
-            * this entry  has just an integer sub-identifier
-            */
             sub.subid = strtoul(token.lexem.c_str(), nullptr, 10);
             parseToken(file, token);
-            //id->subid = strtoul(token, NULL, 10);
         }
         else
         {
@@ -2921,17 +2035,12 @@ std::vector<SubID> Parser::parseOIDlist(std::ifstream& file)
             _errinf.description = formError("Expected label or number", token.lexem);
             res.clear();
             return res;
-            //print_error("Expected label or number", token, type);
-            //return 0;
         }
 
         res.push_back(sub);
-        //parseToken(file, token);
-        //type = get_token(fp, token, MAXTOKEN);
     }
-    //print_error("Too long OID", token, type);
-    //return 0;
-    if (token.type == LT::eENDOFFILE)
+
+    if (token.type == LT::ENDOFFILE)
     {
         _errinf.isError = true;
         _errinf.description = formError("Too long OID", token.lexem);
@@ -2949,86 +2058,58 @@ EnumList Parser::parseEnums(std::ifstream& file)
 
     parseToken(file, token);
 
-    while (token.type != LT::eENDOFFILE)
+    while (token.type != LT::ENDOFFILE)
     {
-        if (token.type == LT::eRIGHTBRACKET)
+        if (token.type == LT::RIGHTBRACKET)
             break;
         /* some enums use "deprecated" to indicate a no longer value label */
         /* (EG: IP-MIB's IpAddressStatusTC) */
-        if (token.type == LT::eLABEL || token.type == LT::eDEPRECATED)
+        if (token.type == LT::LABEL || token.type == LT::DEPRECATED)
         {
-            /*
-            * this is an enumerated label
-            */
-            //*epp =
-            //	(struct enum_list *) calloc(1, sizeof(struct enum_list));
-            //if (*epp == NULL)
-            //	return (NULL);
-            /*
-            * a reasonable approximation for the length
-            */
-
             Enum enm;
-
             enm.label = token.lexem;
 
-            //(*epp)->label = strdup(token);
-            //type = get_token(fp, token, MAXTOKEN);
             parseToken(file, token);
 
-            if (token.type != LT::eLEFTPAREN)
+            if (token.type != LT::LEFTPAREN)
             {
                 _errinf.isError = true;
                 _errinf.description = formError("Expected \"(\"", token.lexem);
                 return res;
-                //print_error("Expected \"(\"", token, type);
-                //return NULL;
             }
 
             parseToken(file, token);
-            //type = get_token(fp, token, MAXTOKEN);
-            if (token.type != LT::eNUMBER)
+
+            if (token.type != LT::NUMBER)
             {
                 _errinf.isError = true;
                 _errinf.description = formError("Expected integer", token.lexem);
                 return res;
-                //print_error("Expected integer", token, type);
-                //return NULL;
             }
             enm.value = strtol(token.lexem.c_str(), nullptr, 10);
 
-            //(*epp)->value = strtol(token, NULL, 10);
-            //type = get_token(fp, token, MAXTOKEN);
             parseToken(file, token);
 
-            if (token.type != LT::eRIGHTPAREN)
+            if (token.type != LT::RIGHTPAREN)
             {
                 _errinf.isError = true;
                 _errinf.description = formError("Expected \")\"", token.lexem);
                 return res;
-
-                //print_error("Expected \")\"", token, type);
-                //return NULL;
             }
-            //epp = &(*epp)->next;
             res.push_back(enm);
         }
 
         parseToken(file, token);
     }
 
-    if (token.type == LT::eENDOFFILE)
+    if (token.type == LT::ENDOFFILE)
     {
         _errinf.isError = true;
         _errinf.description = formError("Expected \"}\"", token.lexem);
         return res;
-        //print_error("Expected \"}\"", token, type);
-        //return NULL;
     }
 
     return res;
-    //*retp = ep;
-    //return ep;
 }
 
 RangeList Parser::parseRanges(std::ifstream& file)
@@ -3037,29 +2118,18 @@ RangeList Parser::parseRanges(std::ifstream& file)
     Token token;
     Range rng;
     RangeList res;
-
-
-    //int low = 0, high = 0;
-    //char            nexttoken[MAXTOKEN];
-    //int             nexttype;
-    //struct range_list* rp = NULL, ** rpp = &rp;
-    //int             size = 0, taken = 1;
     bool size = false, taken = true;
 
-    //free_ranges(retp);
-
-    //nexttype = get_token(fp, nexttoken, MAXTOKEN);
     parseToken(file, token);
 
-    //if (nexttype == SIZE)
-    if (token.type == LT::eSIZE)
+    if (token.type == LT::SIZE)
     {
         size = true;
         taken = false;
 
         parseToken(file, token);
 
-        if (token.type != LT::eLEFTPAREN)
+        if (token.type != LT::LEFTPAREN)
         {
             _errinf.isError = true;
             _errinf.description = formError("Expected \"(\" after SIZE", token.lexem);
@@ -3071,49 +2141,29 @@ RangeList Parser::parseRanges(std::ifstream& file)
     {
         if (!taken)
             parseToken(file, token);
-        //nexttype = get_token(fp, nexttoken, MAXTOKEN);
         else
             taken = false;
-
-
 
         rng.high = rng.low = strtoul(token.lexem.c_str(), nullptr, 10);
 
         parseToken(file, token);
 
-        //nexttype = get_token(fp, nexttoken, MAXTOKEN);
-        //if (nexttype == RANGE)
-        if (token.type == LT::eRANGE)
+        if (token.type == LT::RANGE)
         {
             parseToken(file, token);
-            //nexttype = get_token(fp, nexttoken, MAXTOKEN);
-            //errno = 0;
+
             rng.high = strtoul(token.lexem.c_str(), nullptr, 10);
-            //if (errno == ERANGE)
-            //{
-                //if (netsnmp_ds_get_int(NETSNMP_DS_LIBRARY_ID,
-                //	NETSNMP_DS_LIB_MIB_WARNINGS))
-                //	snmp_log(LOG_WARNING,
-                //		"Warning: Upper bound not handled correctly (%s != %d): At line %d in %s\n",
-                //		nexttoken, high, mibLine, File);
-            //}
-            //nexttype = get_token(fp, nexttoken, MAXTOKEN);
+
             parseToken(file, token);
         }
 
         res.push_back(rng);
-        //*rpp = (struct range_list*)calloc(1, sizeof(struct range_list));
-        //if (*rpp == NULL)
-        //	break;
-        //(*rpp)->low = low;
-        //(*rpp)->high = high;
-        //rpp = &(*rpp)->next;
 
-    } while (token.type == LT::eBAR);//(nexttype == BAR);
+    } while (token.type == LT::BAR);
 
     if (size)
     {
-        if (token.type != LT::eRIGHTPAREN)
+        if (token.type != LT::RIGHTPAREN)
         {
             _errinf.isError = true;
             _errinf.description = formError("Expected \")\" after SIZE", token.lexem);
@@ -3121,25 +2171,15 @@ RangeList Parser::parseRanges(std::ifstream& file)
             return res;
         }
 
-        //if (nexttype != RIGHTPAREN)
-        //	print_error("Expected \")\" after SIZE", nexttoken, nexttype);
-        //nexttype = get_token(fp, nexttoken, nexttype);
         parseToken(file, token);
     }
 
-    if (token.type != LT::eRIGHTPAREN)
+    if (token.type != LT::RIGHTPAREN)
     {
         _errinf.isError = true;
         _errinf.description = formError("Expected \")\"", token.lexem);
         res.clear();
     }
-
-    //if (nexttype != RIGHTPAREN)
-    //	print_error("Expected \")\"", nexttoken, nexttype);
-    //
-    //*retp = rp;
-    //return rp;
-
 
     return res;
 }
@@ -3149,30 +2189,20 @@ IndexList Parser::parseIndexes(std::ifstream& file)
     Token token;
     Index indx;
     IndexList res;
-
-    //int             type;
-    //char            token[MAXTOKEN];
-    //char            nextIsImplied = 0;
     bool nextIsImplied = false;
 
-    //struct index_list* mylist = NULL;
-    //struct index_list** mypp = &mylist;
-
-    //free_indexes(retp);
-
-    //type = get_token(fp, token, MAXTOKEN);
     parseToken(file, token);
 
-    if (token.type != LT::eLEFTBRACKET)
+    if (token.type != LT::LEFTBRACKET)
     {
         return res;
     }
 
     parseToken(file, token);
-    //type = get_token(fp, token, MAXTOKEN);
-    while (token.type != LT::eRIGHTBRACKET && token.type != LT::eENDOFFILE)
+
+    while (token.type != LT::RIGHTBRACKET && token.type != LT::ENDOFFILE)
     {
-        if ((token.type == LT::eLABEL) || (token.type & LT::eSYNTAX_MASK))
+        if ((token.type == LT::LABEL) || (token.type & LT::SYNTAX_MASK))
         {
             indx.ilabel = token.lexem;
             indx.isimplied = nextIsImplied;
@@ -3180,27 +2210,13 @@ IndexList Parser::parseIndexes(std::ifstream& file)
             res.push_back(indx);
 
             nextIsImplied = false;
-            //*mypp =
-            //	(struct index_list*)calloc(1, sizeof(struct index_list));
-            //if (*mypp)
-            //{
-            //	(*mypp)->ilabel = _strdup(token);
-            //	(*mypp)->isimplied = nextIsImplied;
-            //	mypp = &(*mypp)->next;
-            //	nextIsImplied = 0;
-            //}
         }
-        else if (token.type == LT::eIMPLIED)
+        else if (token.type == LT::IMPLIED)
         {
             nextIsImplied = true;
         }
-        //type = get_token(fp, token, MAXTOKEN);
         parseToken(file, token);
     }
-
-    //*retp = mylist;
-    //return mylist;
-
 
     return res;
 }
@@ -3211,29 +2227,37 @@ VarbindList Parser::parseVarbinds(std::ifstream& file)
     VarbindList res;
 
     parseToken(file, token);
-    //type = get_token(fp, token, MAXTOKEN);
 
-    if (token.type != LT::eLEFTBRACKET)
+    if (token.type != LT::LEFTBRACKET)
     {
         return res;
-        //return NULL;
     }
 
     parseToken(file, token);
-    //type = get_token(fp, token, MAXTOKEN);
-    while (token.type != LT::eRIGHTBRACKET && token.type != LT::eENDOFFILE)
+
+    while (token.type != LT::RIGHTBRACKET && token.type != LT::ENDOFFILE)
     {
-        if (token.type == LT::eLABEL || token.type & LT::eSYNTAX_MASK)
+        if (token.type == LT::LABEL || token.type & LT::SYNTAX_MASK)
         {
             res.push_back(token.lexem);
         }
+        else if (token.type != LT::COMMA)
+        {
+            _errinf.isError = true;
+            _errinf.description = formError("Expected \",\"", token.lexem);
+            res.clear();
+            break;
+        }
 
         parseToken(file, token);
-        //type = get_token(fp, token, MAXTOKEN);
     }
 
-    //*retp = mylist;
-    //return mylist;
+    if (token.type != LT::RIGHTBRACKET)
+    {
+        _errinf.isError = true;
+        _errinf.description = formError("Expected \"}\"", token.lexem);
+    }
+
     return res;
 }
 
@@ -3242,15 +2266,13 @@ bool Parser::checkUTC(const std::string& utc)
     size_t len;
     int year, month, day, hour, minute;
 
-    len = utc.size();//strlen(utc);
+    len = utc.size();
 
     if (utc.back() != 'Z' && utc.back() != 'z')
     {
         _errinf.isError = true;
         _errinf.description = formError("Timestamp should end with Z", utc);
         return false;
-        //print_error("Timestamp should end with Z", utc, QUOTESTRING);
-        //return;
     }
 
     if (len == 11)
@@ -3267,8 +2289,6 @@ bool Parser::checkUTC(const std::string& utc)
     {
         _errinf.isError = true;
         _errinf.description = formError("Bad timestamp format (11 or 13 characters)", utc);
-        //print_error("Bad timestamp format (11 or 13 characters)",
-        //	utc, QUOTESTRING);
         return false;
     }
 
@@ -3277,8 +2297,6 @@ bool Parser::checkUTC(const std::string& utc)
         _errinf.isError = true;
         _errinf.description = formError("Bad timestamp format", utc);
         return false;
-        //print_error("Bad timestamp format", utc, QUOTESTRING);
-        //return;
     }
 
     if (month < 1 || month > 12)
@@ -3287,136 +2305,97 @@ bool Parser::checkUTC(const std::string& utc)
         _errinf.description = formError("Bad month in timestamp", utc);
         return false;
     }
-    //print_error("Bad month in timestamp", utc, QUOTESTRING);
+
     if (day < 1 || day > 31)
     {
         _errinf.isError = true;
         _errinf.description = formError("Bad day in timestamp", utc);
         return false;
     }
-    //print_error("Bad day in timestamp", utc, QUOTESTRING);
+
     if (hour < 0 || hour > 23)
     {
         _errinf.isError = true;
         _errinf.description = formError("Bad hour in timestamp", utc);
         return false;
     }
-    //print_error("Bad hour in timestamp", utc, QUOTESTRING);
+
     if (minute < 0 || minute > 59)
     {
         _errinf.isError = true;
         _errinf.description = formError("Bad minute in timestamp", utc);
         return false;
     }
-    //print_error("Bad minute in timestamp", utc, QUOTESTRING);
+
     return true;
 }
 
 void Parser::tossObjectIdentifier(std::ifstream& file, Token& token)
 {
-    //int             type;
-    //char            token[MAXTOKEN];
-    int             bracketCount = 1;
-
-    token.type = LT::eOTHER;
-
+    int bracketCount = 1;
+    token.type = LT::OTHER;
     parseToken(file, token);
-    //type = get_token(fp, token, MAXTOKEN);
 
-    if (token.type != LT::eLEFTBRACKET)
+    if (token.type != LT::LEFTBRACKET)
         return;
 
-    while ((token.type != LT::eRIGHTBRACKET || bracketCount > 0) && token.type != LT::eENDOFFILE)
+    while ((token.type != LT::RIGHTBRACKET || bracketCount > 0) && token.type != LT::ENDOFFILE)
     {
         parseToken(file, token);
-        //type = get_token(fp, token, MAXTOKEN);
-        if (token.type == LT::eLEFTBRACKET)
+        if (token.type == LT::LEFTBRACKET)
             bracketCount++;
-        else if (token.type == LT::eRIGHTBRACKET)
+        else if (token.type == LT::RIGHTBRACKET)
             bracketCount--;
     }
 
-    if (token.type == LT::eRIGHTBRACKET)
-        token.type = LT::eOBJID;
-    //else
-    //	return 0;
+    if (token.type == LT::RIGHTBRACKET)
+        token.type = LT::OBJID;
 }
 
 void Parser::eatSyntax(std::ifstream& file, Token& token)
 {
-    //int             type, nexttype;
-    //struct node* np = alloc_node(current_module);
-    //char            nexttoken[MAXTOKEN];
-
-    //if (!np)
-    //	return 0;
-
-    //type = get_token(fp, token, maxtoken);
-    //nexttype = get_token(fp, nexttoken, MAXTOKEN);
-
     parseToken(file, token);
     LT lasttype = token.type;
     parseToken(file, token);
 
     switch (lasttype)
     {
-    case LT::eINTEGER:
-    case LT::eINTEGER32:
-    case LT::eUINTEGER32:
-    case LT::eUNSIGNED32:
-    case LT::eCOUNTER:
-    case LT::eGAUGE:
-    case LT::eBITSTRING:
-    case LT::eLABEL:
+    case LT::INTEGER:
+    case LT::INTEGER32:
+    case LT::UINTEGER32:
+    case LT::UNSIGNED32:
+    case LT::COUNTER:
+    case LT::GAUGE:
+    case LT::BITSTRING:
+    case LT::LABEL:
 
-        //if (nexttype == LEFTBRACKET)
-        if (token.type == LT::eLEFTBRACKET)
+        if (token.type == LT::LEFTBRACKET)
         {
-            /*
-            * if there is an enumeration list, parse it
-            */
             parseEnums(file);
-            //np->enums = parse_enumlist(fp, &np->enums);
-            //nexttype = get_token(fp, nexttoken, MAXTOKEN);
-
             parseToken(file, token);
         }
-        else if (token.type == LT::eLEFTPAREN)
+        else if (token.type == LT::LEFTPAREN)
         {
-            /*
-            * if there is a range list, parse it
-            */
             parseRanges(file);
-            //np->ranges = parse_ranges(fp, &np->ranges);
-            //nexttype = get_token(fp, nexttoken, MAXTOKEN);
             parseToken(file, token);
         }
         break;
-    case LT::eOCTETSTR:
-    case LT::eOPAQUE:
-        /*
-        * parse any SIZE specification
-        */
-
-        if (token.type == LT::eLEFTPAREN)
+    case LT::OCTETSTR:
+    case LT::OPAQUE:
+        if (token.type == LT::LEFTPAREN)
         {
             parseToken(file, token);
-            //nexttype = get_token(fp, nexttoken, MAXTOKEN);
-            if (token.type == LT::eSIZE)
+            if (token.type == LT::SIZE)
             {
                 parseToken(file, token);
-                //nexttype = get_token(fp, nexttoken, MAXTOKEN);
-                if (token.type == LT::eLEFTPAREN)
+                if (token.type == LT::LEFTPAREN)
                 {
                     parseRanges(file);
-                    //np->ranges = parse_ranges(fp, &np->ranges);
-                    //nexttype = get_token(fp, nexttoken, MAXTOKEN);      /* ) */
                     parseToken(file, token);
 
-                    if (token.type == LT::eRIGHTPAREN)
+                    if (token.type == LT::RIGHTPAREN)
                     {
                         parseToken(file, token);
-                        //nexttype = get_token(fp, nexttoken, MAXTOKEN);
                         break;
                     }
                 }
@@ -3425,31 +2404,21 @@ void Parser::eatSyntax(std::ifstream& file, Token& token)
             _errinf.isError = true;
             _errinf.description = formError("Bad SIZE syntax", token.lexem);
             return;
-            //print_error("Bad SIZE syntax", token, type);
-            //free_node(np);
-            //return nexttype;
         }
         break;
-    case LT::eOBJID:
-    case LT::eNETADDR:
-    case LT::eIPADDR:
-    case LT::eTIMETICKS:
-    case LT::eNULL:
-    case LT::eNSAPADDRESS:
-    case LT::eCOUNTER64:
+    case LT::OBJID:
+    case LT::NETADDR:
+    case LT::IPADDR:
+    case LT::TIMETICKS:
+    case LT::NUL:
+    case LT::NSAPADDRESS:
+    case LT::COUNTER64:
         break;
     default:
 
         _errinf.isError = true;
-        _errinf.description = formError("Bad syntax", token.lexem);
-        //parseToken(file, token);
-
-        //print_error("Bad syntax", token, type);
-        //free_node(np);
-        //return nexttype;
+        _errinf.description = formError("Bad SYNTAX", typeToStr(lasttype));
     }
-    //free_node(np);
-    //return nexttype;
 }
 
 bool Parser::complianceLookup(const std::string& name, const std::string& moduleName)
@@ -3461,14 +2430,14 @@ bool Parser::complianceLookup(const std::string& name, const std::string& module
         return true;
     }
 
-    return _tree->findNode(name, moduleName) != nullptr;
+    return (_tree ? _tree->findNode(name, moduleName) : nullptr) != nullptr;
 }
 
 Parser::LoadStatus Parser::readModuleInternal(const std::string& moduleName)
 {
-    auto mp = _tree->findModule(moduleName);
+    auto mp = _tree ? _tree->findModule(moduleName) : nullptr;
 
-    if (mp && mp->moduleName == moduleName)
+    if (mp)// && mp->moduleName == moduleName)
     {
         if (mp->isParsed)
             return LoadStatus::MODULE_ALREADY_LOADED;
@@ -3501,69 +2470,28 @@ Parser::LoadStatus Parser::readModuleInternal(const std::string& moduleName)
     return LoadStatus::MODULE_NOT_FOUND;
 }
 
-Parser::LoadStatus Parser::readImportReplacements(const std::string& oldModuleName, Module::Imports& imports)
-{
-    /*
-     * Look for matches first
-     */
-
-    auto& import = imports.back();
-    size_t sizeLabels = import.labels.size();
-    size_t sizeMC = _modCompats.size();
-
-    for (size_t i = 0; i < sizeLabels; ++i)
-    {
-        auto const& label = import.labels[i];
-
-        for (size_t j = 0; j < sizeMC; ++j)
-        {
-            auto const& mc = _modCompats[j];
-
-            if (mc.oldModule == oldModuleName)
-            {
-                if (mc.tag.empty() || (!mc.prefix && label == mc.tag) || (mc.prefix && label.find(mc.tag) != std::string::npos))
-                {
-                    auto status = readModuleInternal(mc.newModule);
-
-                    if (status != LoadStatus::MODULE_NOT_FOUND)
-                    {
-                        size_t sizeImports = imports.size();
-                        for (size_t k = 0; k < sizeImports; ++k)
-                            if (imports[k].moduleName == mc.newModule)
-                            {
-                                imports[k].labels.push_back(label);
-                                import.labels.erase(import.labels.begin() + i);
-                                return status;
-                            }
-
-                        imports.emplace_back(mc.newModule, Strs{ label });
-                        import.labels.erase(import.labels.begin() + i);
-                    }
-
-                    return status;
-                }
-            }
-        }
-    }
-
-    return readModuleReplacements(oldModuleName);
-}
-
 Parser::LoadStatus Parser::readModuleReplacements(const std::string& oldModuleName)
 {
-
     size_t size = _modCompats.size();
+    LoadStatus current = LoadStatus::MODULE_NOT_FOUND;
 
     for (size_t i = 0; i < size; ++i)
     {
         auto const& mc = _modCompats[i];
         if (mc.oldModule == oldModuleName)
         {
-            return readModuleInternal(mc.newModule);
+            auto status = readModuleInternal(mc.newModule);
+
+            if (status != LoadStatus::MODULE_LOADED_OK)
+            {
+                return status;
+            }
+
+            current = status;
         }
     }
 
-    return LoadStatus::MODULE_NOT_FOUND;
+    return current;
 }
 
 void Parser::scanObjlist(const NodeList& root, const Module::Ptr& mp, Objgroup& objlist)
@@ -3580,7 +2508,7 @@ void Parser::scanObjlist(const NodeList& root, const Module::Ptr& mp, Objgroup& 
                 break;
             }
 
-        if (!found)
+        if (!found && mp)
         {
             auto const& imports = mp->imports;
             size_t sizeImp = imports.size();
@@ -3622,16 +2550,35 @@ void Parser::scanObjlist(const NodeList& root, const Module::Ptr& mp, Objgroup& 
 
 void Parser::resolveSyntax()
 {
+
     for (auto it = _undefNodes.begin(); it != _undefNodes.end();)
     {
-        auto index = _tclist.getTCIndex(it->syntax);
+        auto const& syntax = it->syntax;
+        size_t i = 0, TCsize = _tclist.size();
 
-        if (index >= 0)
+        for (; i < TCsize; ++i)
         {
-            it->node->type = _tclist.getTC(index).type;
-            it = _undefNodes.erase(it);
+            auto const& tc = _tclist[i];
+
+            if (tc.descriptor == syntax)
+            {
+                auto& node = it->node;
+
+                node->syntax = tc.syntax;
+                node->hint = tc.hint;
+
+                if (node->ranges.empty() && !tc.ragnes.empty())
+                    node->ranges = tc.ragnes;
+
+                if (node->enums.empty() && !tc.enums.empty())
+                    node->enums = tc.enums;
+
+                it = _undefNodes.erase(it);
+                break;
+            }
         }
-        else
+
+        if (i == TCsize)
             ++it;
     }
 
@@ -3649,8 +2596,10 @@ void Parser::resolveSyntax()
 
 std::string Parser::formError(const std::string& str, const std::string& lexem)
 {
-    std::cout << "Loading " + _moduleName + ": ERROR" << std::endl;
-    return str + " (" + lexem + "): At line " + std::to_string(_line) + " in " + _moduleName;
+    return str +
+        (!lexem.empty() ? " (" + lexem + ")" : "") +
+        ": At line " + std::to_string(_line) + " in " +
+        (_moduleName.empty() ? "(EMPTY)" : _moduleName);
 }
 
 void Parser::parseToken(std::ifstream& file, Token& token)
@@ -3664,28 +2613,22 @@ void Parser::parseToken(std::ifstream& file, Token& token)
         token.lexem.clear();
         more = false;
 
-        /*
-        * skip all white space
-        */
         do
         {
             ch = file.get();
-            //ch = netsnmp_getc(fp);
             if (ch == '\n')
                 ++_line;
-            //	mibLine++;
         } while (isspace(ch) && ch != EOF);
 
         token.lexem += ch;
-        //*cp++ = ch;
-        //*cp = '\0';
+
         switch (ch)
         {
         case EOF:
-            token.type = LT::eENDOFFILE;
+            token.type = LT::ENDOFFILE;
             return;
-            //return ENDOFFILE;
         case '"':
+            token.lexem.pop_back();
             parseQuoteString(file, token);
             return;
         case '\'':                 /* binary or hex constant */
@@ -3707,45 +2650,36 @@ void Parser::parseToken(std::ifstream& file, Token& token)
                     break;
                 }
                 token.lexem += ch;
-                /*if (cp - token < maxtlen - 2)
-                    *cp++ = ch;*/
             }
             if (ch == '\'')
             {
                 unsigned long   val = 0;
-                //char           *run = token + 1;
                 ch = file.get();
+
                 switch (ch)
                 {
                 case EOF:
-                    token.type = LT::eENDOFFILE;
+                    token.type = LT::ENDOFFILE;
                     return;
                 case 'b':
                 case 'B':
                     if (seenSymbols > bdigits)
                     {
                         token.lexem += '\'';
-                        token.type = LT::eLABEL;
+                        token.type = LT::LABEL;
                         return;
-                        /**cp++ = '\'';
-                        *cp = 0;
-                        return LABEL;*/
                     }
                     for (int i = 1; i < token.lexem.size(); ++i)
                         val = val * 2 + token.lexem[i] - '0';
-                    //while (run != token.lexem.back())
-                    //	val = val * 2 + *run++ - '0';
+
                     break;
                 case 'h':
                 case 'H':
                     if (seenSymbols > xdigits)
                     {
                         token.lexem += '\'';
-                        token.type = LT::eLABEL;
+                        token.type = LT::LABEL;
                         return;
-                        /**cp++ = '\'';
-                        *cp = 0;
-                        return LABEL;*/
                     }
                     for (int i = 1; i < token.lexem.size(); ++i)
                     {
@@ -3760,96 +2694,75 @@ void Parser::parseToken(std::ifstream& file, Token& token)
                     break;
                 default:
                     token.lexem += '\'';
-                    token.type = LT::eLABEL;
+                    token.type = LT::LABEL;
                     return;
-                    /**cp++ = '\'';
-                    *cp = 0;
-                    return LABEL;*/
                 }
                 token.lexem = std::to_string(val);
-                token.type = LT::eNUMBER;
+                token.type = LT::NUMBER;
                 return;
-                //sprintf(token, "%ld", val);
-                //return NUMBER;
             }
             token.lexem += ch;
-            token.type = LT::eLABEL;
+            token.type = LT::LABEL;
             return;
 
-            //return LABEL;
         case '(':
-            token.type = LT::eLEFTPAREN;
+            token.type = LT::LEFTPAREN;
             return;
-            //return LEFTPAREN;
         case ')':
-            token.type = LT::eRIGHTPAREN;
+            token.type = LT::RIGHTPAREN;
             return;
-            //return RIGHTPAREN;
         case '{':
-            token.type = LT::eLEFTBRACKET;
+            token.type = LT::LEFTBRACKET;
             return;
-            //return LEFTBRACKET;
         case '}':
-            token.type = LT::eRIGHTBRACKET;
+            token.type = LT::RIGHTBRACKET;
             return;
-            //return RIGHTBRACKET;
         case '[':
-            token.type = LT::eLEFTSQBRACK;
+            token.type = LT::LEFTSQBRACK;
             return;
-            //return LEFTSQBRACK;
         case ']':
-            token.type = LT::eRIGHTSQBRACK;
+            token.type = LT::RIGHTSQBRACK;
             return;
-            //return RIGHTSQBRACK;
         case ';':
-            token.type = LT::eSEMI;
+            token.type = LT::SEMI;
             return;
-            //return SEMI;
         case ',':
-            token.type = LT::eCOMMA;
+            token.type = LT::COMMA;
             return;
-            //return COMMA;
         case '|':
-            token.type = LT::eBAR;
+            token.type = LT::BAR;
             return;
-            //return BAR;
         case '.':
             token.lexem += file.get();
-            //ch_next = file.get();
-            //ch_next = netsnmp_getc(fp);
+
             if (token.lexem.back() == '.')
             {
-                token.type = LT::eRANGE;
+                token.type = LT::RANGE;
                 return;
-                //return RANGE;
             }
             file.unget();
-            token.type = LT::eLABEL;
+            token.type = LT::LABEL;
             return;
-            //ungetc(ch_next, fp);
-            //return LABEL;
+
         case ':':
-            //ch_next = file.get();
+
             token.lexem += file.get();
-            //ch_next = netsnmp_getc(fp);
+
             if (token.lexem.back() != ':')
             {
                 file.unget();
-                token.type = LT::eLABEL;
+                token.type = LT::LABEL;
                 return;
-                //ungetc(ch_next, fp);
-                //return LABEL;
             }
+
             token.lexem += file.get();
-            //ch_next = file.get();
-            //ch_next = netsnmp_getc(fp);
             if (token.lexem.back() != '=')
             {
                 file.unget();
-                token.type = LT::eLABEL;
+                token.type = LT::LABEL;
                 return;
             }
-            token.type = LT::eEQUALS;
+            token.type = LT::EQUALS;
             return;
 
         case '-':
@@ -3867,22 +2780,17 @@ void Parser::parseToken(std::ifstream& file, Token& token)
                 more = true;
                 continue;
             }
+
             file.unget();
-            //ungetc(ch_next, fp);
             /* fallthrough */
         default:
-            /*
-            * Accumulate characters until end of token is found.  Then attempt to
-            * match this token as a reserved word.  If a match is found, return the
-            * type.  Else it is a label.
-            */
+
             if (!isLabelChar(ch))
             {
-                token.type = LT::eLABEL;
+                token.type = LT::LABEL;
                 return;
             }
 
-            //bool more = true;
             while (true)
             {
                 while (isLabelChar(ch = file.get()))
@@ -3891,13 +2799,13 @@ void Parser::parseToken(std::ifstream& file, Token& token)
 
                 file.unget();
 
-                auto it = _lexemTypes.find(token.lexem);
+                auto it = _lexemTable.find(token.lexem);
 
-                if (it != _lexemTypes.end())
+                if (it != _lexemTable.end())
                 {
                     token.type = it->second;
 
-                    if (token.type != LT::eCONTINUE)
+                    if (token.type != LT::CONTINUE)
                         return;
 
                     while (isspace((ch = file.get())));
@@ -3907,7 +2815,7 @@ void Parser::parseToken(std::ifstream& file, Token& token)
 
                     if (ch == EOF)
                     {
-                        token.type = LT::eENDOFFILE;
+                        token.type = LT::ENDOFFILE;
                         return;
                     }
 
@@ -3926,23 +2834,54 @@ void Parser::parseToken(std::ifstream& file, Token& token)
                 for (int i = 1; i < token.lexem.size(); ++i)
                     if (!isdigit((unsigned char)token.lexem[i]))
                     {
-                        token.type = LT::eLABEL;
+                        token.type = LT::LABEL;
                         return;
                     }
 
-                token.type = LT::eNUMBER;
+                token.type = LT::NUMBER;
                 return;
             }
 
-            token.type = LT::eLABEL;
+            token.type = LT::LABEL;
         }
     }
+}
+
+std::string Parser::typeToStr(LT type)
+{
+    for (auto const& lexemPair : _lexemTable)
+        if (lexemPair.second == type)
+            return lexemPair.first;
+
+    if (type == LT::OBJID)
+        return "OBJECT IDENTIFIER";
+
+    return "";
+}
+
+Strs Parser::getModuleReplacements(const std::string& oldModule)
+{
+    Strs res;
+
+    for (size_t i = 0, size = _modCompats.size(); i < size; ++i)
+    {
+        auto const& mc = _modCompats[i];
+
+        if (mc.oldModule == oldModule)
+        {
+            if (std::find(res.begin(), res.end(), mc.newModule) == res.end())
+                res.push_back(mc.newModule);
+        }
+    }
+
+    return res;
 }
 
 void Parser::parseQuoteString(std::ifstream& file, Token& token)
 {
     //token.lexem.clear();
     bool newLine = false;
+    char lastChar = '\0';
 
     for (char ch = file.get(); ch != EOF; ch = file.get())
     {
@@ -3959,26 +2898,24 @@ void Parser::parseQuoteString(std::ifstream& file, Token& token)
         else
             newLine = false;
 
-        if (ch == ' ' && token.lexem.back() == ' ')
+        if (ch == ' ' && lastChar == ' ')
             continue;
-
-        token.lexem += ch;
 
         if (ch == '"')
         {
-            token.type = LT::eQUOTESTRING;
+            token.type = LT::QUOTESTRING;
             return;
         }
+
+        token.lexem += ch;
+        lastChar = ch;
     }
 
-    token.type = LT::eENDOFFILE;
+    token.type = LT::ENDOFFILE;
 }
 
-void Parser::parse(std::ifstream& file)
+NodeList Parser::parse(std::ifstream& file)
 {
-    //char            LT[MAXLexemType];
-    //char            name[MAXLexemType + 1];
-
     _line = 1;
     _moduleName.clear();
     _errinf.isError = false;
@@ -3988,277 +2925,263 @@ void Parser::parse(std::ifstream& file)
     NodeList result;
     NodeList nodes;
     Module::Ptr mp;
-
-    //std::string LT;
     std::string name;
-
-    LT lasttype = LT::eLABEL;
+    LT lasttype = LT::LABEL;
 
 #define BETWEEN_MIBS          1
 #define IN_MIB                2
     int state = BETWEEN_MIBS;
 
-    while (token.type != LT::eENDOFFILE)
+    while (token.type != LT::ENDOFFILE)
     {
-        if (lasttype == LT::eCONTINUE)
+        if (lasttype == LT::CONTINUE)
             lasttype = token.type;
         else
         {
             parseToken(file, token);
             lasttype = token.type;
         }
-        //type = lasttype = parseToken(file, token);
 
         switch (token.type)
         {
-        case LT::eEND:
+        case LT::END:
             if (state != IN_MIB)
             {
                 _errinf.isError = true;
-                _errinf.description = formError("Error, END before start of MIB", token.lexem);
-                return;
+                _errinf.description = formError("END before BEGIN");
+                return EmptyResult;
             }
             else
             {
                 scanObjlist(result, mp, _objgroups);
                 if (_errinf.isError)
-                    return;
+                    return EmptyResult;
 
                 scanObjlist(result, mp, _objects);
                 if (_errinf.isError)
-                    return;
+                    return EmptyResult;
 
                 scanObjlist(result, mp, _notifs);
                 if (_errinf.isError)
-                    return;
+                    return EmptyResult;
 
                 resolveSyntax();
                 if (_errinf.isError)
-                    return;
+                    return EmptyResult;
 
-                _tree->linkupNodes(result);
+                if (_tree)
+                    _tree->linkupNodes(result);
 
                 if (!result.empty())
                 {
                     _errinf.isError = true;
                     _errinf.description = "Can't link up nodes of " + _moduleName;
-                    return;
+                    //return;
                 }
             }
 
             state = BETWEEN_MIBS;
             continue;
-        case LT::eIMPORTS:
+        case LT::IMPORTS:
 
             parseImports(file);
 
             if (_errinf.isError)
-                return;
+                return EmptyResult;
 
             continue;
-        case LT::eEXPORTS:
+        case LT::EXPORTS:
 
-            while (token.type != LT::eSEMI && token.type != LT::eENDOFFILE)
+            while (token.type != LT::SEMI && token.type != LT::ENDOFFILE)
                 parseToken(file, token);
 
             continue;
 
-        case LT::eENDOFFILE:
+        case LT::ENDOFFILE:
+
+            scanObjlist(result, mp, _objgroups);
+            if (_errinf.isError)
+                continue;
+
+            scanObjlist(result, mp, _objects);
+            if (_errinf.isError)
+                continue;
+
+            scanObjlist(result, mp, _notifs);
+            if (_errinf.isError)
+                continue;
+
+            resolveSyntax();
+
             continue;
         default:
             break;
         }
-        name = token.lexem;
-        //strlcpy(name, LT, sizeof(name));
-        parseToken(file, token);
-        //type = get_LexemType(fp, LT, MAXLexemType);
-        //nnp = NULL;
 
-        /*
-        * Handle obsolete method to assign an object identifier to a
-        * module
-        */
-        if (lasttype == LT::eLABEL && token.type == LT::eLEFTBRACKET)
+        name = token.lexem;
+        parseToken(file, token);
+
+        if (lasttype == LT::LABEL && token.type == LT::LEFTBRACKET)
         {
-            while (token.type != LT::eRIGHTBRACKET && token.type != LT::eENDOFFILE)
+            while (token.type != LT::RIGHTBRACKET && token.type != LT::ENDOFFILE)
                 parseToken(file, token);
 
-            //while (type != RIGHTBRACKET && type != ENDOFFILE)
-            //	type = get_LexemType(fp, LT, MAXLexemType);
-
-            if (token.type == LT::eENDOFFILE)
+            if (token.type == LT::ENDOFFILE)
             {
                 _errinf.isError = true;
                 _errinf.description = formError("Expected \"}\"", token.lexem);
-                return;
-                //result.clear();
-                //return result;
-                //print_error("Expected \"}\"", LT, type);
-                //gMibError = MODULE_SYNTAX_ERROR;
-                //goto error;
-                //return NULL;
+                return EmptyResult;
             }
 
             parseToken(file, token);
-            //type = get_LexemType(fp, LT, MAXLexemType);
         }
 
         switch (token.type)
         {
-        case LT::eDEFINITIONS:
+        case LT::DEFINITIONS:
 
             if (state != BETWEEN_MIBS)
             {
                 _errinf.isError = true;
                 _errinf.description = formError("Error, nested MIBS", token.lexem);
-                return;
-                //result.clear();
-                //return result;
-                //print_error("Error, nested MIBS", NULL, type);
-                //gMibError = MODULE_SYNTAX_ERROR;
-                //goto error;
-                //return NULL;
+                return EmptyResult;
             }
             state = IN_MIB;
 
-            while (token.type != LT::eENDOFFILE)
+            while (token.type != LT::ENDOFFILE)
             {
                 parseToken(file, token);
-                if (token.type == LT::eBEGIN)
+                if (token.type == LT::BEGIN)
                     break;
             }
 
             _moduleName = name;
 
-            mp = _tree->findModule(_moduleName);
+
+            mp = _tree ? _tree->findModule(_moduleName) : nullptr;
 
             if (!mp)
             {
                 _errinf.isError = true;
-                _errinf.description = "Module " + token.lexem + " not found.";
-                return;
+                _errinf.description = "Module " + _moduleName + " not found.";
+                return EmptyResult;
             }
 
             if (mp->isParsed)
-                return;
+                return EmptyResult;
 
             mp->isParsed = true;
 
             break;
-        case LT::eOBJTYPE:
+        case LT::OBJTYPE:
         {
             nodes = parseObjType(file, name);
             break;
         }
-        case LT::eOBJGROUP:
+        case LT::OBJGROUP:
         {
-            nodes = parseObjectGroup(file, name, LT::eOBJECT, _objects);
+            nodes = parseObjectGroup(file, name, LT::OBJECTS, _objects);
             break;
         }
-        case LT::eNOTIFGROUP:
+        case LT::NOTIFGROUP:
         {
-            nodes = parseObjectGroup(file, name, LT::eNOTIFICATIONS, _notifs);
+            nodes = parseObjectGroup(file, name, LT::NOTIFICATIONS, _notifs);
             break;
         }
-        case LT::eTRAPTYPE:
+        case LT::TRAPTYPE:
         {
             nodes = parseTrap(file, name);
             break;
         }
-        case LT::eNOTIFTYPE:
+        case LT::NOTIFTYPE:
         {
             nodes = parseNotifType(file, name);
             break;
         }
-        case LT::eCOMPLIANCE:
+        case LT::COMPLIANCE:
         {
             nodes = parseCompliance(file, name);
             break;
         }
-        case LT::eAGENTCAP:
+        case LT::AGENTCAP:
         {
             nodes = parseCapabilities(file, name);
             break;
         }
-        case LT::eMACRO:
+        case LT::MACRO:
         {
-            nodes = parseMacro(file);
-            nodes.clear();
+            parseMacro(file).clear();
             break;
         }
-        case LT::eMODULEIDENTITY:
+        case LT::MODULEIDENTITY:
         {
             nodes = parseModuleIdentity(file, name);
             break;
         }
-        case LT::eOBJIDENTITY:
+        case LT::OBJIDENTITY:
         {
-            nodes = parseObjectGroup(file, name, LT::eOBJECT, _objects);
+            nodes = parseObjectGroup(file, name, LT::OBJECTS, _objects);
             break;
         }
-        case LT::eOBJECT:
+        case LT::OBJECT:
         {
             parseToken(file, token);
-            //type = get_LexemType(fp, LT, MAXLexemType);
-            if (token.type != LT::eIDENTIFIER)
+            if (token.type != LT::IDENTIFIER)
             {
                 _errinf.isError = true;
                 _errinf.description = formError("Expected IDENTIFIER", token.lexem);
-                return;
-                //result.clear();
-                //return result;
-                //print_error("Expected IDENTIFIER", LT, type);
-                //gMibError = MODULE_SYNTAX_ERROR;
-                //goto error;
-                //return NULL;
+                return EmptyResult;
             }
+
             parseToken(file, token);
-            //type = get_LexemType(fp, LT, MAXLexemType);
-            if (token.type != LT::eEQUALS)
+            if (token.type != LT::EQUALS)
             {
                 _errinf.isError = true;
                 _errinf.description = formError("Expected \"::=\"", token.lexem);
-                return;
-                //result.clear();
-                //return result;
-                //print_error("Expected \"::=\"", LT, type);
-                //gMibError = MODULE_SYNTAX_ERROR;
-                //goto error;
-                //return NULL;
+                return EmptyResult;
             }
-            //nnp = parse_objectid(fp, name);
             nodes = parseObjectid(file, name);
             break;
         }
-        case LT::eEQUALS:
+        case LT::EQUALS:
         {
             nodes = parseASN(file, token, name);
-            lasttype = LT::eCONTINUE;
+            lasttype = LT::CONTINUE;
             break;
         }
-        case LT::eENDOFFILE:
+        case LT::ENDOFFILE:
             break;
         default:
             _errinf.isError = true;
             _errinf.description = formError("Bad operator", token.lexem);
-            return;
+            return EmptyResult;
         }
 
         if (_errinf.isError)
-            return;
+            return EmptyResult;
 
         if (!nodes.empty())
+        {
+            auto& np = nodes.back();
+            if (np->type == LT::NA)
+                np->type = token.type;
+
             result.splice(result.end(), std::move(nodes));
+        }
 
     }
 
-    std::cout << "Loading " + _moduleName + ": OK" << std::endl;
-    return;
+    return result;
 }
 
-const ErrorInfo& Parser::lastErrorInfo()
+ErrorInfo Parser::lastErrorInfo()
 {
     return _errinf;
+}
+
+Parser::TCList Parser::tcList()
+{
+    return _tclist;
 }
 
 Parser::UndefinedNode::UndefinedNode(const Node::Ptr& Node, const std::string& Syntax) :

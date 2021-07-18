@@ -1,0 +1,6 @@
+<RCC>
+  <qresource prefix="icons">
+    <file>img/viewer.png</file>
+    <file>img/mib-list.png</file>
+  </qresource>
+</RCC>
