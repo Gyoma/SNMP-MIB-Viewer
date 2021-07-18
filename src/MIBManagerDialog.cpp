@@ -3,10 +3,10 @@
 #include <QJsonArray>
 #include <QJsonObject>
 #include <QMessageBox>
-#include <MIBManagerDialog.h>
-#include <Parser.h>
+#include "MIBManagerDialog.h"
+#include "Parser.h"
+#include "ui/ui_MIBManagerDialog.h"
 #include <fstream>
-#include <ui/ui_MIBManagerDialog.h>
 
 MIBManagerDialog::MIBManagerDialog(QWidget * parent, const ModuleMetaDataTable::Ptr& ModulesDataTable) :
     QDialog(parent, Qt::WindowCloseButtonHint),
@@ -401,10 +401,10 @@ void MIBManagerDialog::saveData()
 {
     QDir dir;
 
-    if (!dir.exists("data"))
-        dir.mkpath("data");
+    if (!dir.exists("mibvcache"))
+        dir.mkpath("mibvcache");
 
-    QFile saveFile("data/mibmanager.json");
+    QFile saveFile("mibvcache/mibmanager.json");
 
     if (!saveFile.open(QIODevice::WriteOnly))
         return;
@@ -419,7 +419,7 @@ void MIBManagerDialog::saveData()
 
 void MIBManagerDialog::loadSavedData()
 {
-    QFile loadFile("data/mibmanager.json");
+    QFile loadFile("mibvcache/mibmanager.json");
 
     if (!loadFile.open(QIODevice::ReadOnly))
         return;

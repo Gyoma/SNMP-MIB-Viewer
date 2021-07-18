@@ -1,5 +1,5 @@
-#include <Parser.h>
-#include <TreeModel.h>
+#include "Parser.h"
+#include "TreeModel.h"
 #include <fstream>
 
 
@@ -159,9 +159,6 @@ void Parser::parseImports(std::ifstream& file)
 
     parseToken(file, token);
 
-    /*
-     * Parse the IMPORTS clause
-     */
     while (token.type != LT::SEMI && token.type != LT::ENDOFFILE)
     {
         if (token.type == LT::LABEL)
@@ -179,11 +176,6 @@ void Parser::parseImports(std::ifstream& file)
             }
 
             import.moduleName = token.lexem;
-
-            /*
-             * Recursively read any pre-requisite modules
-             */
-
             imports.push_back(std::move(import));
 
             auto status = readModuleInternal(token.lexem);
@@ -206,12 +198,6 @@ void Parser::parseImports(std::ifstream& file)
         parseToken(file, token);
     }
 
-
-    /*
-     * Save the import information
-     *   in the global module table
-     */
-
     auto& module = _tree ? _tree->findModule(_moduleName) : nullptr;
 
     if (module)
@@ -224,9 +210,6 @@ void Parser::parseImports(std::ifstream& file)
         return;
     }
 
-    /*
-    * Shouldn't get this far
-    */
     _errinf.isError = true;
     _errinf.description = "Module " + _moduleName + " not found.";
 }
@@ -341,20 +324,8 @@ NodeList Parser::parseObjectGroup(std::ifstream& file, const std::string& objNam
     return mergeParsedObjectid(np, file);
 }
 
-
-/*
-* Parses an OBJECT TYPE macro.
-* Returns 0 on error.
-*/
 NodeList Parser::parseObjType(std::ifstream& file, const std::string& objName)
 {
-    //register int    type;
-    //char            token[MAXTOKEN];
-    //char            nexttoken[MAXTOKEN];
-    //char            quoted_string_buffer[MAXQUOTESTR];
-    //int             nexttype, tctype;
-    //register struct node *np;
-
     Token token;
     Node::Ptr np(new Node);
     np->label = objName;
@@ -427,10 +398,6 @@ NodeList Parser::parseObjType(std::ifstream& file, const std::string& objName)
         }
         else if (token.type == LT::LEFTPAREN)
         {
-            /*
-            * if there is a range list, parse it
-            */
-
             np->ranges = parseRanges(file);
 
             if (np->ranges.empty())
@@ -443,10 +410,6 @@ NodeList Parser::parseObjType(std::ifstream& file, const std::string& objName)
         break;
     case LT::OCTETSTR:
     case LT::OPAQUE:
-
-        /*
-        * parse any SIZE specification
-        */
         if (token.type == LT::LEFTPAREN)
         {
             parseToken(file, token);
@@ -692,15 +655,10 @@ NodeList Parser::parseObjType(std::ifstream& file, const std::string& objName)
     return mergeParsedObjectid(np, file);
 }
 
-/*
-* Parses a NOTIFICATION-TYPE macro.
-* Returns 0 on error.
-*/
 NodeList Parser::parseNotifType(std::ifstream& file, const std::string& objName)
 {
     Node::Ptr np(new Node);
     np->label = objName;
-    //np->syntax = LT::NOTIFTYPE;
 
     Token token;
 
@@ -1146,10 +1104,6 @@ NodeList Parser::parseModuleIdentity(std::ifstream& file, const std::string& obj
     return mergeParsedObjectid(np, file);
 }
 
-/*
-* Parses a capabilities macro
-* Returns 0 on error.
-*/
 NodeList Parser::parseCapabilities(std::ifstream& file, const std::string& objName)
 {
     Node::Ptr np(new Node);
@@ -1454,10 +1408,6 @@ NodeList Parser::parseCapabilities(std::ifstream& file, const std::string& objNa
     return mergeParsedObjectid(np, file);
 }
 
-/*
-* Parses an asn type.  Structures are ignored by this parser.
-* Returns NULL on error.
-*/
 NodeList Parser::parseASN(std::ifstream& file, Token& token, const std::string& objName)
 {
     TC tc;
@@ -1721,9 +1671,6 @@ NodeList Parser::parseASN(std::ifstream& file, Token& token, const std::string& 
         }
         else if (token.type == LT::LEFTBRACKET)
         {
-            /*
-            * if there is an enumeration list, parse it
-            */
             tc.enums = parseEnums(file);
             parseToken(file, token);
         }
@@ -1820,9 +1767,6 @@ NodeList Parser::parseTrap(std::ifstream& file, const std::string& objName)
             }
             break;
         default:
-            /*
-            * NOTHING
-            */
             break;
         }
 
@@ -1840,7 +1784,6 @@ NodeList Parser::parseTrap(std::ifstream& file, const std::string& objName)
 
     np->subid = strtoul(token.lexem.c_str(), nullptr, 10);
 
-    /* Catch the syntax error */
     if (np->parentName.empty())
     {
         return EmptyResult;
@@ -1849,11 +1792,6 @@ NodeList Parser::parseTrap(std::ifstream& file, const std::string& objName)
     return NodeList({ np });
 }
 
-/*
-* Parses a MACRO definition
-* Expect BEGIN, discard everything to end.
-* Returns 0 on error.
-*/
 NodeList Parser::parseMacro(std::ifstream& file)
 {
     Node::Ptr np(new Node);
@@ -1900,11 +1838,6 @@ NodeList Parser::parseMacro(std::ifstream& file)
     return NodeList({ np });
 }
 
-
-/*
-Merge the parsed object identifier with the existing node.
-If there is a problem with the identifier, release the existing node.
-*/
 NodeList Parser::mergeParsedObjectid(Node::Ptr& np, std::ifstream& file)
 {
     auto res = parseObjectid(file, np->label);
@@ -1924,29 +1857,6 @@ NodeList Parser::mergeParsedObjectid(Node::Ptr& np, std::ifstream& file)
     return res;
 }
 
-
-/*
-* Parse a sequence of object subidentifiers for the given name.
-* The "label OBJECT IDENTIFIER ::=" portion has already been parsed.
-*
-* The majority of cases take this form :
-* label OBJECT IDENTIFIER ::= { parent 2 }
-* where a parent label and a child subidentifier number are specified.
-*
-* Variations on the theme include cases where a number appears with
-* the parent, or intermediate subidentifiers are specified by label,
-* by number, or both.
-*
-* Here are some representative samples :
-* internet        OBJECT IDENTIFIER ::= { iso org(3) dod(6) 1 }
-* mgmt            OBJECT IDENTIFIER ::= { internet 2 }
-* rptrInfoHealth  OBJECT IDENTIFIER ::= { snmpDot3RptrMgt 0 4 }
-*
-* Here is a very rare form :
-* iso             OBJECT IDENTIFIER ::= { 1 }
-*
-* Returns NULL on error.  When this happens, memory may be leaked.
-*/
 NodeList Parser::parseObjectid(std::ifstream& file, const std::string& objName)
 {
 
@@ -1969,11 +1879,6 @@ NodeList Parser::parseObjectid(std::ifstream& file, const std::string& objName)
         _errinf.description = formError("Bad object identifier");
         return res;
     }
-
-    /*
-    * Handle numeric-only object identifiers,
-    *  by labelling the first sub-identifier
-    */
 
     if (oids[0].label.empty())
     {
@@ -2007,10 +1912,6 @@ NodeList Parser::parseObjectid(std::ifstream& file, const std::string& objName)
         }
     }
 
-    /*
-    * Handle  "label OBJECT-IDENTIFIER ::= { subid }"
-    */
-
     if (oids.size() == 1)
     {
         np = Node::Ptr(new Node);
@@ -2020,11 +1921,6 @@ NodeList Parser::parseObjectid(std::ifstream& file, const std::string& objName)
         res.push_back(np);
         return res;
     }
-
-    /*
-    * For each parent-child subid pair in the subid array,
-    * create a node and link it into the node list.
-    */
 
     size_t size = oids.size();
     for (size_t i = 0; i < size - 1; ++i)
@@ -2063,13 +1959,6 @@ NodeList Parser::parseObjectid(std::ifstream& file, const std::string& objName)
     return res;
 }
 
-
-/*
-* Takes a list of the form:
-* { iso org(3) dod(6) 1 }
-* and creates several nodes, one for each parent-child pair.
-* Returns 0 on error.
-*/
 std::vector<SubID> Parser::parseOIDlist(std::ifstream& file)
 {
     std::vector<SubID> res;
@@ -2137,9 +2026,6 @@ std::vector<SubID> Parser::parseOIDlist(std::ifstream& file)
         }
         else if (token.type == LT::NUMBER)
         {
-            /*
-            * this entry  has just an integer sub-identifier
-            */
             sub.subid = strtoul(token.lexem.c_str(), nullptr, 10);
             parseToken(file, token);
         }
@@ -2485,28 +2371,17 @@ void Parser::eatSyntax(std::ifstream& file, Token& token)
 
         if (token.type == LT::LEFTBRACKET)
         {
-            /*
-            * if there is an enumeration list, parse it
-            */
             parseEnums(file);
-
             parseToken(file, token);
         }
         else if (token.type == LT::LEFTPAREN)
         {
-            /*
-            * if there is a range list, parse it
-            */
             parseRanges(file);
             parseToken(file, token);
         }
         break;
     case LT::OCTETSTR:
     case LT::OPAQUE:
-        /*
-        * parse any SIZE specification
-        */
-
         if (token.type == LT::LEFTPAREN)
         {
             parseToken(file, token);
@@ -2738,9 +2613,6 @@ void Parser::parseToken(std::ifstream& file, Token& token)
         token.lexem.clear();
         more = false;
 
-        /*
-        * skip all white space
-        */
         do
         {
             ch = file.get();
@@ -2912,11 +2784,7 @@ void Parser::parseToken(std::ifstream& file, Token& token)
             file.unget();
             /* fallthrough */
         default:
-            /*
-            * Accumulate characters until end of token is found.  Then attempt to
-            * match this token as a reserved word.  If a match is found, return the
-            * type.  Else it is a label.
-            */
+
             if (!isLabelChar(ch))
             {
                 token.type = LT::LABEL;
@@ -3003,11 +2871,6 @@ Strs Parser::getModuleReplacements(const std::string& oldModule)
         {
             if (std::find(res.begin(), res.end(), mc.newModule) == res.end())
                 res.push_back(mc.newModule);
-            //if (mc.tag.empty())
-            //    return mc.newModule;
-
-            //if ((!mc.prefix && label == mc.tag) || (mc.prefix && label.find(mc.tag) != std::string::npos))
-            //    return mc.newModule;
         }
     }
 
@@ -3158,10 +3021,6 @@ NodeList Parser::parse(std::ifstream& file)
         name = token.lexem;
         parseToken(file, token);
 
-        /*
-        * Handle obsolete method to assign an object identifier to a
-        * module
-        */
         if (lasttype == LT::LABEL && token.type == LT::LEFTBRACKET)
         {
             while (token.type != LT::RIGHTBRACKET && token.type != LT::ENDOFFILE)
