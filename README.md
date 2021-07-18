@@ -1,1 +1,1 @@
-SNMP-MIB-Parser
+SNMP-MIB-Viewer
