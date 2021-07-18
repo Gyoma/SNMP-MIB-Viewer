@@ -1,5 +1,5 @@
 #pragma once
-#include <GlobalTypes.h>
+#include "GlobalTypes.h"
 
 struct Node
 {

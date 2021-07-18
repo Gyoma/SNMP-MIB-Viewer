@@ -1,7 +1,7 @@
 #pragma once
 #include <QMainWindow>
-#include <TreeModel.h>
-#include <Parser.h>
+#include "TreeModel.h"
+#include "Parser.h"
 
 namespace Ui
 {
@@ -10,14 +10,14 @@ namespace Ui
 
 class ModuleManagmentDialog;
 
-class MIBBrowserWindow : public QMainWindow
+class MIBViewerWindow : public QMainWindow
 {
     Q_OBJECT
 
 public:
 
-    explicit MIBBrowserWindow(QWidget* parent = nullptr);
-    ~MIBBrowserWindow();
+    explicit MIBViewerWindow(QWidget* parent = nullptr);
+    ~MIBViewerWindow();
 
 private:
 

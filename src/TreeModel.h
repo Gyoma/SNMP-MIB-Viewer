@@ -1,6 +1,6 @@
 #pragma once
 #include <QAbstractItemModel>
-#include <Module.h>
+#include "Module.h"
 
 class Parser;
 

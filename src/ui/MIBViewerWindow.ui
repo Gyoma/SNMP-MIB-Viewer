@@ -23,7 +23,11 @@
    </size>
   </property>
   <property name="windowTitle">
-   <string>MIB Браузер</string>
+   <string>MIB viewer</string>
+  </property>
+  <property name="windowIcon">
+   <iconset resource="../resource/res.qrc">
+    <normaloff>:/icons/img/viewer.png</normaloff>:/icons/img/viewer.png</iconset>
   </property>
   <widget class="QWidget" name="centralwidget">
    <layout class="QGridLayout" name="gridLayout_3">
@@ -40,7 +44,7 @@
         </sizepolicy>
        </property>
        <property name="title">
-        <string>MIB Дерево</string>
+        <string>MIB Tree</string>
        </property>
        <property name="flat">
         <bool>false</bool>
@@ -49,7 +53,7 @@
         <bool>false</bool>
        </property>
        <layout class="QGridLayout" name="gridLayout">
-        <item row="1" column="0" colspan="2">
+        <item row="1" column="0" colspan="4">
          <widget class="QTreeView" name="treeView">
           <property name="minimumSize">
            <size>
@@ -62,14 +66,14 @@
           </property>
          </widget>
         </item>
-        <item row="0" column="0">
-         <widget class="QPushButton" name="MIBButton">
+        <item row="0" column="1">
+         <widget class="QPushButton" name="expandButton">
           <property name="text">
-           <string>MIBs</string>
+           <string>Expand all</string>
           </property>
          </widget>
         </item>
-        <item row="0" column="1">
+        <item row="0" column="3">
          <spacer name="horizontalSpacer">
           <property name="orientation">
            <enum>Qt::Horizontal</enum>
@@ -82,6 +86,24 @@
           </property>
          </spacer>
         </item>
+        <item row="0" column="0">
+         <widget class="QPushButton" name="MIBButton">
+          <property name="text">
+           <string/>
+          </property>
+          <property name="icon">
+           <iconset resource="../resource/res.qrc">
+            <normaloff>:/icons/img/mib-list.png</normaloff>:/icons/img/mib-list.png</iconset>
+          </property>
+         </widget>
+        </item>
+        <item row="0" column="2">
+         <widget class="QPushButton" name="collapseButton">
+          <property name="text">
+           <string>Collapse all</string>
+          </property>
+         </widget>
+        </item>
        </layout>
       </widget>
       <widget class="QGroupBox" name="propertiesBox">
@@ -92,7 +114,7 @@
         </sizepolicy>
        </property>
        <property name="title">
-        <string>Параметры</string>
+        <string>Properties</string>
        </property>
        <layout class="QVBoxLayout" name="verticalLayout_7">
         <item>
@@ -115,7 +137,7 @@
              <x>0</x>
              <y>0</y>
              <width>331</width>
-             <height>1708</height>
+             <height>1644</height>
             </rect>
            </property>
            <property name="sizePolicy">
@@ -158,75 +180,12 @@
                   </sizepolicy>
                  </property>
                  <property name="text">
-                  <string>Имя:</string>
+                  <string>Name:</string>
                  </property>
                 </widget>
                </item>
                <item>
                 <widget class="QLineEdit" name="nodeLabelLine">
-                 <property name="sizePolicy">
-                  <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
-                   <horstretch>0</horstretch>
-                   <verstretch>0</verstretch>
-                  </sizepolicy>
-                 </property>
-                 <property name="readOnly">
-                  <bool>true</bool>
-                 </property>
-                </widget>
-               </item>
-              </layout>
-             </widget>
-            </item>
-            <item>
-             <widget class="QWidget" name="subIDWidget" native="true">
-              <property name="sizePolicy">
-               <sizepolicy hsizetype="Expanding" vsizetype="Minimum">
-                <horstretch>0</horstretch>
-                <verstretch>0</verstretch>
-               </sizepolicy>
-              </property>
-              <layout class="QVBoxLayout" name="idVLayout">
-               <property name="leftMargin">
-                <number>0</number>
-               </property>
-               <property name="topMargin">
-                <number>0</number>
-               </property>
-               <property name="rightMargin">
-                <number>0</number>
-               </property>
-               <property name="bottomMargin">
-                <number>0</number>
-               </property>
-               <item>
-                <widget class="Line" name="line_2">
-                 <property name="sizePolicy">
-                  <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
-                   <horstretch>0</horstretch>
-                   <verstretch>0</verstretch>
-                  </sizepolicy>
-                 </property>
-                 <property name="orientation">
-                  <enum>Qt::Horizontal</enum>
-                 </property>
-                </widget>
-               </item>
-               <item>
-                <widget class="QLabel" name="subIDLabel">
-                 <property name="sizePolicy">
-                  <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
-                   <horstretch>0</horstretch>
-                   <verstretch>0</verstretch>
-                  </sizepolicy>
-                 </property>
-                 <property name="text">
-                  <string>ID:</string>
-                 </property>
-                </widget>
-               </item>
-               <item>
-                <widget class="QLineEdit" name="subIDLine">
                  <property name="sizePolicy">
                   <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
                    <horstretch>0</horstretch>
@@ -347,7 +306,7 @@
                   </sizepolicy>
                  </property>
                  <property name="text">
-                  <string>Текстовый OID:</string>
+                  <string>Textual OID:</string>
                  </property>
                 </widget>
                </item>
@@ -413,7 +372,7 @@
                   </sizepolicy>
                  </property>
                  <property name="text">
-                  <string>Модули:</string>
+                  <string>Modules:</string>
                  </property>
                 </widget>
                </item>
@@ -494,7 +453,7 @@
                   </sizepolicy>
                  </property>
                  <property name="text">
-                  <string>Тип:</string>
+                  <string>Type:</string>
                  </property>
                 </widget>
                </item>
@@ -557,7 +516,7 @@
                   </sizepolicy>
                  </property>
                  <property name="text">
-                  <string>Доступ:</string>
+                  <string>Access:</string>
                  </property>
                 </widget>
                </item>
@@ -620,7 +579,7 @@
                   </sizepolicy>
                  </property>
                  <property name="text">
-                  <string>Статус:</string>
+                  <string>Status:</string>
                  </property>
                 </widget>
                </item>
@@ -683,7 +642,7 @@
                   </sizepolicy>
                  </property>
                  <property name="text">
-                  <string>Дополнения:</string>
+                  <string>Augments:</string>
                  </property>
                 </widget>
                </item>
@@ -734,7 +693,7 @@
                <item>
                 <widget class="QLabel" name="displayHintLabel">
                  <property name="text">
-                  <string>Подсказка для отображения:</string>
+                  <string>Display hint:</string>
                  </property>
                 </widget>
                </item>
@@ -791,7 +750,7 @@
                   </sizepolicy>
                  </property>
                  <property name="text">
-                  <string>Справка:</string>
+                  <string>Reference:</string>
                  </property>
                 </widget>
                </item>
@@ -854,7 +813,7 @@
                   </sizepolicy>
                  </property>
                  <property name="text">
-                  <string>Значение по умолчанию:</string>
+                  <string>Default value:</string>
                  </property>
                 </widget>
                </item>
@@ -908,7 +867,7 @@
                <item>
                 <widget class="QLabel" name="enumsLabel">
                  <property name="text">
-                  <string>Перечислениe значений:</string>
+                  <string>Enumerations:</string>
                  </property>
                 </widget>
                </item>
@@ -947,7 +906,7 @@
                <item>
                 <widget class="QLabel" name="rangeLabel">
                  <property name="text">
-                  <string>Диапозон значений:</string>
+                  <string>Range:</string>
                  </property>
                 </widget>
                </item>
@@ -995,7 +954,7 @@
                <item>
                 <widget class="QLabel" name="varbindsLabel">
                  <property name="text">
-                  <string>Привязка переменных:</string>
+                  <string>Var. bindings:</string>
                  </property>
                 </widget>
                </item>
@@ -1055,7 +1014,7 @@
                   </sizepolicy>
                  </property>
                  <property name="text">
-                  <string>Описание:</string>
+                  <string>Description:</string>
                  </property>
                 </widget>
                </item>
@@ -1110,6 +1069,8 @@
    </property>
   </action>
  </widget>
- <resources/>
+ <resources>
+  <include location="../resource/res.qrc"/>
+ </resources>
  <connections/>
 </ui>

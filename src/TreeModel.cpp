@@ -1,7 +1,7 @@
 #include <QMessageBox>
 #include <QIcon>
-#include <TreeModel.h>
-#include <Parser.h>
+#include "TreeModel.h"
+#include "Parser.h"
 #include <fstream>
 
 TreeModel::TreeModel(const ModuleTable::Ptr& moduleTable) :
